@@ -7,6 +7,13 @@ if (!isset($_SESSION['logged_in'])) {
 
 require_once 'config.php';
 
+// Handle POST to save selected users to session
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['selected_users'])) {
+    $_SESSION['bulk_archive_users'] = $_POST['selected_users'];
+    echo json_encode(['success' => true]);
+    exit;
+}
+
 // Check for progress request
 if (isset($_GET['check_progress'])) {
     $progress_file = __DIR__ . '/data/temp/bulk_archive_progress.json';

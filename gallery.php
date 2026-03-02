@@ -18,6 +18,68 @@ $error = '';
 $db = getDB();
 $site_name = getSetting('site_name', 'TheArchive');
 
+// Create tables with all enhanced columns
+try {
+    $db->exec('CREATE TABLE IF NOT EXISTS archive_users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        folder_name TEXT NOT NULL UNIQUE,
+        display_name TEXT,
+        notes TEXT,
+        profile_image TEXT,
+        url_1 TEXT,
+        url_2 TEXT,
+        url_3 TEXT,
+        location TEXT,
+        is_favorite INTEGER DEFAULT 0,
+        color_label TEXT DEFAULT NULL,
+        view_count INTEGER DEFAULT 0,
+        last_viewed DATETIME DEFAULT NULL,
+        file_count INTEGER DEFAULT 0,
+        storage_size INTEGER DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )');
+} catch (PDOException $e) {
+    // Table exists
+}
+
+try {
+    $db->exec('CREATE TABLE IF NOT EXISTS user_tags (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL UNIQUE,
+        color TEXT DEFAULT "#6b7280",
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )');
+} catch (PDOException $e) {
+    // Table exists
+}
+
+try {
+    $db->exec('CREATE TABLE IF NOT EXISTS user_tag_assignments (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        tag_id INTEGER NOT NULL,
+        assigned_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES archive_users(id) ON DELETE CASCADE,
+        FOREIGN KEY (tag_id) REFERENCES user_tags(id) ON DELETE CASCADE,
+        UNIQUE(user_id, tag_id)
+    )');
+} catch (PDOException $e) {
+    // Table exists
+}
+
+try {
+    $db->exec('CREATE TABLE IF NOT EXISTS file_type_stats (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        file_extension TEXT NOT NULL UNIQUE,
+        file_count INTEGER DEFAULT 0,
+        total_size INTEGER DEFAULT 0,
+        last_updated DATETIME DEFAULT CURRENT_TIMESTAMP
+    )');
+} catch (PDOException $e) {
+    // Table exists
+}
+
 // Handle bulk archive
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['bulk_archive'])) {
     $selected_users = $_POST['selected_users'] ?? [];
@@ -72,6 +134,12 @@ if (is_dir($archive_base)) {
         if (!$user_data || !$user_data['storage_size']) {
             $size = 0;
             $file_count = 0;
+            $image_count = 0;
+            $video_count = 0;
+            
+            $allowed_img = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+            $allowed_vid = ['mp4', 'mov', 'webm'];
+            
             $iterator = new RecursiveIteratorIterator(
                 new RecursiveDirectoryIterator($folder_path, FilesystemIterator::SKIP_DOTS)
             );
@@ -79,6 +147,10 @@ if (is_dir($archive_base)) {
                 if ($file->isFile()) {
                     $size += $file->getSize();
                     $file_count++;
+                    
+                    $ext = strtolower($file->getExtension());
+                    if (in_array($ext, $allowed_img)) $image_count++;
+                    if (in_array($ext, $allowed_vid)) $video_count++;
                 }
             }
             
@@ -90,6 +162,23 @@ if (is_dir($archive_base)) {
         } else {
             $size = $user_data['storage_size'];
             $file_count = $user_data['file_count'];
+            
+            // Count image and video files
+            $image_count = 0;
+            $video_count = 0;
+            $allowed_img = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+            $allowed_vid = ['mp4', 'mov', 'webm'];
+            
+            $iterator = new RecursiveIteratorIterator(
+                new RecursiveDirectoryIterator($folder_path, FilesystemIterator::SKIP_DOTS)
+            );
+            foreach ($iterator as $file) {
+                if ($file->isFile()) {
+                    $ext = strtolower($file->getExtension());
+                    if (in_array($ext, $allowed_img)) $image_count++;
+                    if (in_array($ext, $allowed_vid)) $video_count++;
+                }
+            }
         }
         
         // Get user tags
@@ -109,6 +198,8 @@ if (is_dir($archive_base)) {
             'data' => $user_data,
             'size' => $size,
             'file_count' => $file_count,
+            'image_count' => $image_count,
+            'video_count' => $video_count,
             'tags' => $user_tags,
             'is_favorite' => $user_data['is_favorite'] ?? 0,
             'color_label' => $user_data['color_label'] ?? null,
@@ -235,10 +326,11 @@ function format_bytes($bytes) {
             position: sticky;
             top: 70px;
             z-index: 10;
-            background: var(--bs-body-bg);
+            background: var(--bs-dark);
+            color: var(--bs-light);
             padding: 1rem;
             border-radius: 8px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
             display: none;
         }
         .bulk-actions.show {
@@ -286,10 +378,10 @@ function format_bytes($bytes) {
                 <form method="POST" id="bulkForm">
                     <div class="d-flex align-items-center gap-2 flex-wrap">
                         <span class="fw-bold"><span id="selectedCount">0</span> selected</span>
-                        <button type="submit" name="bulk_archive" class="btn btn-warning btn-sm">
+                        <button type="button" class="btn btn-warning btn-sm" onclick="bulkArchive()">
                             <i class="bi bi-archive"></i> Archive Selected
                         </button>
-                        <button type="submit" name="bulk_download" class="btn btn-primary btn-sm">
+                        <button type="button" class="btn btn-primary btn-sm" onclick="bulkDownload()">
                             <i class="bi bi-download"></i> Download as ZIP
                         </button>
                         <button type="button" class="btn btn-secondary btn-sm" onclick="clearSelection()">
@@ -397,7 +489,8 @@ function format_bytes($bytes) {
                                 
                                 <div class="small text-muted mb-2">
                                     <div><i class="bi bi-hdd"></i> <?php echo format_bytes($user['size']); ?></div>
-                                    <div><i class="bi bi-files"></i> <?php echo number_format($user['file_count']); ?> files</div>
+                                    <div><i class="bi bi-image"></i> <?php echo number_format($user['image_count']); ?> images</div>
+                                    <div><i class="bi bi-camera-video"></i> <?php echo number_format($user['video_count']); ?> videos</div>
                                     <?php if ($user['view_count'] > 0): ?>
                                         <div><i class="bi bi-eye"></i> <?php echo number_format($user['view_count']); ?> views</div>
                                     <?php endif; ?>
@@ -480,7 +573,124 @@ function format_bytes($bytes) {
                     }
                 });
         }
+        
+        function bulkArchive() {
+            if (selectedUsers.size === 0) {
+                alert('No users selected');
+                return;
+            }
+            
+            const modal = new bootstrap.Modal(document.getElementById('bulkArchiveModal'));
+            modal.show();
+            
+            // Save selected users to session
+            fetch('bulk_archive.php', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                body: 'selected_users=' + encodeURIComponent(JSON.stringify(Array.from(selectedUsers)))
+            }).then(() => {
+                // Start actual archiving
+                fetch('bulk_archive.php').catch(err => console.error(err));
+            });
+            
+            // Poll for progress
+            const checkProgress = setInterval(function() {
+                fetch('bulk_archive.php?check_progress=1')
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.status === 'idle') return;
+                        
+                        const progressBar = document.getElementById('bulkArchiveProgressBar');
+                        const progressText = document.getElementById('bulkArchiveProgressText');
+                        
+                        progressBar.style.width = data.progress + '%';
+                        progressBar.textContent = data.progress + '%';
+                        progressText.textContent = data.message;
+                        
+                        if (data.status === 'complete') {
+                            clearInterval(checkProgress);
+                            setTimeout(() => {
+                                window.location.href = 'gallery.php?success=' + encodeURIComponent(data.message);
+                            }, 1000);
+                        }
+                    });
+            }, 500);
+        }
+        
+        function bulkDownload() {
+            if (selectedUsers.size === 0) {
+                alert('No users selected');
+                return;
+            }
+            
+            const modal = new bootstrap.Modal(document.getElementById('bulkDownloadModal'));
+            modal.show();
+            
+            // Save selected users and start download
+            fetch('bulk_download.php', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                body: 'selected_users=' + encodeURIComponent(JSON.stringify(Array.from(selectedUsers)))
+            }).then(() => {
+                fetch('bulk_download.php').catch(err => console.error(err));
+            });
+            
+            // Poll for progress
+            const checkProgress = setInterval(function() {
+                fetch('bulk_download.php?check_progress=1')
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.status === 'idle') return;
+                        
+                        const progressBar = document.getElementById('bulkDownloadProgressBar');
+                        const progressText = document.getElementById('bulkDownloadProgressText');
+                        
+                        progressBar.style.width = data.progress + '%';
+                        progressBar.textContent = data.progress + '%';
+                        progressText.textContent = data.message;
+                        
+                        if (data.status === 'complete') {
+                            clearInterval(checkProgress);
+                            window.location.href = 'bulk_download_ready.php?file=' + encodeURIComponent(data.download_url.split('/').pop());
+                        }
+                    });
+            }, 500);
+        }
     </script>
+    
+    <!-- Bulk Archive Progress Modal -->
+    <div class="modal fade" id="bulkArchiveModal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Bulk Archiving...</h5>
+                </div>
+                <div class="modal-body">
+                    <div class="progress mb-2" style="height: 30px;">
+                        <div id="bulkArchiveProgressBar" class="progress-bar progress-bar-striped progress-bar-animated bg-warning" style="width: 0%">0%</div>
+                    </div>
+                    <div id="bulkArchiveProgressText" class="text-center text-muted">Starting...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Bulk Download Progress Modal -->
+    <div class="modal fade" id="bulkDownloadModal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Creating Bulk Download...</h5>
+                </div>
+                <div class="modal-body">
+                    <div class="progress mb-2" style="height: 30px;">
+                        <div id="bulkDownloadProgressBar" class="progress-bar progress-bar-striped progress-bar-animated" style="width: 0%">0%</div>
+                    </div>
+                    <div id="bulkDownloadProgressText" class="text-center text-muted">Starting...</div>
+                </div>
+            </div>
+        </div>
+    </div>
     
     <!-- ZIP Upload Modal -->
     <div class="modal fade" id="uploadZipModal" tabindex="-1">

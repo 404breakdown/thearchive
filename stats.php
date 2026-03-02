@@ -350,7 +350,7 @@ $site_name = getSetting('site_name', 'TheArchive');
                             <?php else: ?>
                                 <div class="list-group list-group-flush">
                                     <?php foreach ($top_viewed as $idx => $user): ?>
-                                        <div class="list-group-item px-0 d-flex justify-content-between align-items-center">
+                                        <div class="list-group-item px-0 d-flex justify-content-between align-items-center bg-transparent">
                                             <div>
                                                 <span class="badge bg-primary me-2"><?php echo $idx + 1; ?></span>
                                                 <a href="gallery_view.php?user=<?php echo urlencode($user['folder_name']); ?>" class="text-decoration-none">
@@ -387,7 +387,7 @@ $site_name = getSetting('site_name', 'TheArchive');
                             <?php else: ?>
                                 <div class="list-group list-group-flush">
                                     <?php foreach ($top_storage as $idx => $user): ?>
-                                        <div class="list-group-item px-0 d-flex justify-content-between align-items-center">
+                                        <div class="list-group-item px-0 d-flex justify-content-between align-items-center bg-transparent">
                                             <div>
                                                 <span class="badge bg-warning text-dark me-2"><?php echo $idx + 1; ?></span>
                                                 <a href="gallery_view.php?user=<?php echo urlencode($user['folder_name']); ?>" class="text-decoration-none">

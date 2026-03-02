@@ -34,13 +34,13 @@ $site_name = 'TheArchive';
                         <div id="downloadSection" style="display: none;">
                             <i class="bi bi-check-circle text-success" style="font-size: 4rem;"></i>
                             <h4 class="mt-3 mb-4">Download Ready!</h4>
-                            <a href="data/temp/<?php echo htmlspecialchars($filename); ?>" class="btn btn-success btn-lg" download>
+                            <a href="data/temp/<?php echo htmlspecialchars($filename); ?>" class="btn btn-success btn-lg" download id="downloadLink">
                                 <i class="bi bi-download"></i> Download ZIP
                             </a>
                             <div class="mt-3">
                                 <a href="gallery.php" class="btn btn-outline-light">Back to Gallery</a>
                             </div>
-                            <p class="text-muted small mt-3">Note: This file will be automatically deleted after download</p>
+                            <p class="text-muted small mt-3">File will be deleted after you download it</p>
                         </div>
                     </div>
                 </div>
@@ -66,6 +66,13 @@ $site_name = 'TheArchive';
                         clearInterval(checkProgress);
                         document.getElementById('progressSection').style.display = 'none';
                         document.getElementById('downloadSection').style.display = 'block';
+                        
+                        // Delete file after download
+                        document.getElementById('downloadLink').addEventListener('click', function() {
+                            setTimeout(function() {
+                                fetch('delete_temp_file.php?file=<?php echo urlencode($filename); ?>');
+                            }, 1000); // Give download a second to start
+                        });
                     }
                 });
         }, 500);
