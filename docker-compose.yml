@@ -1,0 +1,34 @@
+version: '3.8'
+
+services:
+  thearchive:
+    container_name: thearchive
+    # When built locally, use this:
+    # image: thearchive:latest
+    
+    # When pulling from Docker Hub, use this:
+    image: theplotingary/thearchive:latest
+    
+    ports:
+      - '60055:80'
+    
+    restart: unless-stopped
+    
+    volumes:
+      # Application data (database, etc)
+      - /mnt/APPS_NVME/app-data/webservers/thearchive/data:/var/www/html/data
+      
+      # Archive media files
+      - /mnt/Server-Drive-0/Z-Drive/TEST2:/var/www/html/data/archive
+    
+    environment:
+      # Optional environment variables
+      - TZ=Europe/London
+    
+    # Optional: Add health check
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s

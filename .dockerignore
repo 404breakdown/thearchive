@@ -1,0 +1,11 @@
+# Don't include these in the Docker image
+data/
+.git/
+.gitignore
+*.md
+README.md
+docker-compose.yml
+.env
+*.log
+*.zip
+migrate_db.php

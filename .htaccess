@@ -1,0 +1,14 @@
+# Protect database files
+<FilesMatch "\.db$">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+
+Options -Indexes
+
+php_flag display_errors On
+php_value max_execution_time 300
+php_value upload_max_filesize 500M
+php_value post_max_size 500M
+php_value memory_limit 512M
+php_value max_file_uploads 50

@@ -1,0 +1,31 @@
+# Don't commit these to GitHub
+data/
+*.db
+*.sqlite
+*.log
+
+# Environment files
+.env
+.env.local
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Temporary files
+*.tmp
+*.bak
+*~
+
+# Migration scripts (one-time use)
+migrate_db.php
+
+# Docker volumes
+volumes/
