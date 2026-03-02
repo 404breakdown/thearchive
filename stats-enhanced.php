@@ -327,6 +327,109 @@ $site_name = getSetting('site_name', 'TheArchive');
                 </div>
             </div>
             
+            <!-- Enhanced Stats - Top 10 & File Types -->
+            <div class="row g-3 mt-3">
+                <!-- Most Viewed Users -->
+                <div class="col-md-4">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0"><i class="bi bi-eye"></i> Most Viewed Users</h5>
+                        </div>
+                        <div class="card-body">
+                            <?php
+                            $top_viewed = $db->query("
+                                SELECT folder_name, display_name, view_count 
+                                FROM archive_users 
+                                WHERE view_count > 0
+                                ORDER BY view_count DESC 
+                                LIMIT 10
+                            ")->fetchAll(PDO::FETCH_ASSOC);
+                            
+                            if (empty($top_viewed)): ?>
+                                <p class="text-muted small">No view data yet</p>
+                            <?php else: ?>
+                                <div class="list-group list-group-flush">
+                                    <?php foreach ($top_viewed as $idx => $user): ?>
+                                        <div class="list-group-item px-0 d-flex justify-content-between align-items-center">
+                                            <div>
+                                                <span class="badge bg-primary me-2"><?php echo $idx + 1; ?></span>
+                                                <a href="gallery_view.php?user=<?php echo urlencode($user['folder_name']); ?>" class="text-decoration-none">
+                                                    <?php echo htmlspecialchars($user['display_name'] ?? $user['folder_name']); ?>
+                                                </a>
+                                            </div>
+                                            <span class="badge bg-secondary"><?php echo number_format($user['view_count']); ?></span>
+                                        </div>
+                                    <?php endforeach; ?>
+                                </div>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Largest Users by Storage -->
+                <div class="col-md-4">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0"><i class="bi bi-hdd"></i> Largest Users</h5>
+                        </div>
+                        <div class="card-body">
+                            <?php
+                            $top_storage = $db->query("
+                                SELECT folder_name, display_name, storage_size 
+                                FROM archive_users 
+                                WHERE storage_size > 0
+                                ORDER BY storage_size DESC 
+                                LIMIT 10
+                            ")->fetchAll(PDO::FETCH_ASSOC);
+                            
+                            if (empty($top_storage)): ?>
+                                <p class="text-muted small">No storage data yet</p>
+                            <?php else: ?>
+                                <div class="list-group list-group-flush">
+                                    <?php foreach ($top_storage as $idx => $user): ?>
+                                        <div class="list-group-item px-0 d-flex justify-content-between align-items-center">
+                                            <div>
+                                                <span class="badge bg-warning text-dark me-2"><?php echo $idx + 1; ?></span>
+                                                <a href="gallery_view.php?user=<?php echo urlencode($user['folder_name']); ?>" class="text-decoration-none">
+                                                    <?php echo htmlspecialchars($user['display_name'] ?? $user['folder_name']); ?>
+                                                </a>
+                                            </div>
+                                            <span class="badge bg-secondary"><?php echo formatBytes($user['storage_size']); ?></span>
+                                        </div>
+                                    <?php endforeach; ?>
+                                </div>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- File Type Breakdown -->
+                <div class="col-md-4">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0"><i class="bi bi-pie-chart"></i> File Types</h5>
+                        </div>
+                        <div class="card-body">
+                            <canvas id="fileTypeChart" style="max-height: 250px;"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Timeline -->
+            <div class="row g-3 mt-3">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0"><i class="bi bi-clock-history"></i> User Addition Timeline</h5>
+                        </div>
+                        <div class="card-body">
+                            <canvas id="timelineChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
             <!-- Additional Stats -->
             <div class="row g-3">
                 <div class="col-md-6">
@@ -440,6 +543,103 @@ $site_name = getSetting('site_name', 'TheArchive');
             options: {
                 responsive: true,
                 maintainAspectRatio: true
+            }
+        });
+        
+        // File Type Breakdown Pie Chart
+        <?php
+        // Calculate file type stats
+        $file_types = [];
+        $archive_path = __DIR__ . '/data/archive';
+        
+        if (is_dir($archive_path)) {
+            $iterator = new RecursiveIteratorIterator(
+                new RecursiveDirectoryIterator($archive_path, FilesystemIterator::SKIP_DOTS)
+            );
+            
+            foreach ($iterator as $file) {
+                if ($file->isFile()) {
+                    $ext = strtolower($file->getExtension());
+                    if (!isset($file_types[$ext])) {
+                        $file_types[$ext] = ['count' => 0, 'size' => 0];
+                    }
+                    $file_types[$ext]['count']++;
+                    $file_types[$ext]['size'] += $file->getSize();
+                }
+            }
+        }
+        
+        // Sort by count
+        arsort($file_types);
+        $file_types = array_slice($file_types, 0, 8); // Top 8
+        
+        $type_labels = array_keys($file_types);
+        $type_counts = array_column($file_types, 'count');
+        ?>
+        
+        const fileTypeCtx = document.getElementById('fileTypeChart').getContext('2d');
+        new Chart(fileTypeCtx, {
+            type: 'doughnut',
+            data: {
+                labels: <?php echo json_encode($type_labels); ?>,
+                datasets: [{
+                    data: <?php echo json_encode($type_counts); ?>,
+                    backgroundColor: [
+                        '#3b82f6', '#ef4444', '#10b981', '#f59e0b',
+                        '#8b5cf6', '#ec4899', '#06b6d4', '#6b7280'
+                    ]
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: {
+                        position: 'bottom'
+                    }
+                }
+            }
+        });
+        
+        // Timeline Chart - Users added per month
+        <?php
+        $timeline_data = $db->query("
+            SELECT 
+                strftime('%Y-%m', created_at) as month,
+                COUNT(*) as count
+            FROM archive_users
+            WHERE created_at IS NOT NULL
+            GROUP BY month
+            ORDER BY month
+            LIMIT 12
+        ")->fetchAll(PDO::FETCH_ASSOC);
+        
+        $timeline_labels = array_column($timeline_data, 'month');
+        $timeline_counts = array_column($timeline_data, 'count');
+        ?>
+        
+        const timelineCtx = document.getElementById('timelineChart').getContext('2d');
+        new Chart(timelineCtx, {
+            type: 'bar',
+            data: {
+                labels: <?php echo json_encode($timeline_labels); ?>,
+                datasets: [{
+                    label: 'Users Added',
+                    data: <?php echo json_encode($timeline_counts); ?>,
+                    backgroundColor: '#3b82f6'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            stepSize: 1
+                        }
+                    }
+                }
             }
         });
     </script>

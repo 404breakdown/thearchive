@@ -66,7 +66,23 @@ function count_files_in_folder($path, $extensions) {
 }
 
 $allowed_img = ['jpg','jpeg','png','gif','webp'];
-$allowed_vid = ['mp4','mov','avi','mkv','webm'];
+$allowed_vid = ['mp4','mov','webm'];
+
+// Calculate archive size (zipped users)
+$archives_dir = __DIR__ . '/data/archives/';
+$archive_size = 0;
+$archive_count = 0;
+
+if (is_dir($archives_dir)) {
+    foreach (scandir($archives_dir) as $file) {
+        if ($file === '.' || $file === '..') continue;
+        $file_path = $archives_dir . $file;
+        if (is_file($file_path) && pathinfo($file, PATHINFO_EXTENSION) === 'zip') {
+            $archive_size += filesize($file_path);
+            $archive_count++;
+        }
+    }
+}
 
 if (is_dir($archive_base)) {
     $total_size = get_dir_size($archive_base);
@@ -169,6 +185,20 @@ if (is_dir($archive_base)) {
                             <i class="bi bi-hdd" style="font-size: 3rem; color: #a78bfa;"></i>
                             <h2 class="mt-2 mb-0"><?php echo format_bytes($total_size); ?></h2>
                             <p class="text-muted mb-0">Total Storage</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Archive Stats Row -->
+            <div class="row">
+                <div class="col-md-6 mb-4">
+                    <div class="card text-center">
+                        <div class="card-body">
+                            <i class="bi bi-archive" style="font-size: 3rem; color: #f97316;"></i>
+                            <h2 class="mt-2 mb-0"><?php echo format_bytes($archive_size); ?></h2>
+                            <p class="text-muted mb-0">Archived Storage</p>
+                            <small class="text-muted"><?php echo $archive_count; ?> archived users</small>
                         </div>
                     </div>
                 </div>
