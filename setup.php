@@ -5,55 +5,56 @@ session_start();
 $config_file = __DIR__ . '/config.php';
 $setup_complete_file = __DIR__ . '/data/.setup-complete';
 
-if (file_exists($setup_complete_file) || (file_exists($config_file))) {
+if (file_exists($setup_complete_file) || file_exists($config_file)) {
+    // Check if database exists and has admin user
     if (file_exists($config_file)) {
         require_once $config_file;
         
-        // Check if database exists and has admin user
         try {
             $db = getDB();
             $stmt = $db->query("SELECT COUNT(*) FROM users");
             if ($stmt->fetchColumn() > 0) {
                 // Already setup - show warning
-            ?>
-            <!DOCTYPE html>
-            <html lang="en">
-            <head>
-                <meta charset="UTF-8">
-                <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                <title>Already Setup - TheArchive</title>
-                <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-                <style>
-                    body { background: #0f172a; min-height: 100vh; display: flex; align-items: center; }
-                    .card { background: #1e293b; color: #e2e8f0; }
-                </style>
-            </head>
-            <body>
-                <div class="container">
-                    <div class="row justify-content-center">
-                        <div class="col-md-6">
-                            <div class="card shadow">
-                                <div class="card-body text-center py-5">
-                                    <i class="bi bi-exclamation-triangle text-warning" style="font-size: 4rem;"></i>
-                                    <h3 class="mt-3">Setup Already Complete</h3>
-                                    <p class="text-muted">TheArchive is already configured.</p>
-                                    <hr>
-                                    <p class="small text-success">
-                                        <strong><i class="bi bi-shield-check"></i> Secure:</strong> Setup is permanently disabled and cannot be run again.
-                                    </p>
-                                    <a href="index.php" class="btn btn-primary">Go to Login</a>
+                ?>
+                <!DOCTYPE html>
+                <html lang="en">
+                <head>
+                    <meta charset="UTF-8">
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    <title>Already Setup - TheArchive</title>
+                    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+                    <style>
+                        body { background: #0f172a; min-height: 100vh; display: flex; align-items: center; }
+                        .card { background: #1e293b; color: #e2e8f0; }
+                    </style>
+                </head>
+                <body>
+                    <div class="container">
+                        <div class="row justify-content-center">
+                            <div class="col-md-6">
+                                <div class="card shadow">
+                                    <div class="card-body text-center py-5">
+                                        <i class="bi bi-exclamation-triangle text-warning" style="font-size: 4rem;"></i>
+                                        <h3 class="mt-3">Setup Already Complete</h3>
+                                        <p class="text-muted">TheArchive is already configured.</p>
+                                        <hr>
+                                        <p class="small text-success">
+                                            <strong><i class="bi bi-shield-check"></i> Secure:</strong> Setup is permanently disabled and cannot be run again.
+                                        </p>
+                                        <a href="index.php" class="btn btn-primary">Go to Login</a>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     </div>
-                </div>
-            </body>
-            </html>
-            <?php
-            exit;
+                </body>
+                </html>
+                <?php
+                exit;
+            }
+        } catch (Exception $e) {
+            // Continue to setup
         }
-    } catch (Exception $e) {
-        // Continue to setup
     }
 }
 
@@ -152,6 +153,10 @@ CONFIGPHP;
                 display_name TEXT,
                 notes TEXT,
                 profile_image TEXT,
+                url_1 TEXT,
+                url_2 TEXT,
+                url_3 TEXT,
+                location TEXT,
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
             )');
@@ -172,7 +177,7 @@ CONFIGPHP;
             }
             
             // Create setup complete flag
-            file_put_contents(__DIR__ . '/data/.setup-complete', date('Y-m-d H:i:s'));
+            file_put_contents($setup_complete_file, date('Y-m-d H:i:s'));
             
             $success = 'Setup complete! Redirecting to login...';
             header('Refresh: 2; URL=index.php');
