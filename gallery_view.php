@@ -743,36 +743,65 @@ function format_bytes($b) {
             const modal = new bootstrap.Modal(document.getElementById('archiveProgressModal'));
             modal.show();
             
+            console.log('Starting archive for:', username);
+            
             // Trigger archiving in background using iframe
             const iframe = document.createElement('iframe');
             iframe.style.display = 'none';
             iframe.src = 'archive_worker.php?user=' + encodeURIComponent(username);
+            iframe.onload = function() {
+                console.log('Archive worker iframe loaded');
+            };
+            iframe.onerror = function() {
+                console.error('Archive worker iframe failed to load');
+            };
             document.body.appendChild(iframe);
             
             // Poll for progress
+            let attempts = 0;
+            const maxAttempts = 600; // 5 minutes max
             const checkProgress = setInterval(function() {
-                fetch('archive_user.php?check_progress=1&user=' + encodeURIComponent(username))
+                attempts++;
+                
+                fetch('check_progress.php?type=archive&id=' + encodeURIComponent(username))
                     .then(r => r.json())
                     .then(data => {
+                        console.log('Progress:', data);
+                        
                         const progressBar = document.getElementById('archiveProgressBar');
                         const progressText = document.getElementById('archiveProgressText');
                         
-                        if (data.status !== 'idle') {
-                            progressBar.style.width = data.progress + '%';
-                            progressBar.textContent = data.progress + '%';
-                            progressText.textContent = data.message;
+                        if (data.status && data.status !== 'idle') {
+                            progressBar.style.width = (data.progress || 0) + '%';
+                            progressBar.textContent = (data.progress || 0) + '%';
+                            progressText.textContent = data.message || 'Processing...';
                         }
                         
                         if (data.status === 'complete') {
                             clearInterval(checkProgress);
-                            document.body.removeChild(iframe);
+                            if (iframe.parentNode) document.body.removeChild(iframe);
                             setTimeout(() => {
                                 window.location.href = 'gallery.php?success=User archived successfully';
                             }, 1000);
                         }
+                        
+                        if (data.status === 'error') {
+                            clearInterval(checkProgress);
+                            if (iframe.parentNode) document.body.removeChild(iframe);
+                            alert('Archive failed: ' + (data.message || 'Unknown error'));
+                            modal.hide();
+                        }
+                        
+                        if (attempts >= maxAttempts) {
+                            clearInterval(checkProgress);
+                            console.error('Timeout waiting for archive');
+                            alert('Archive is taking too long. Check if it completed.');
+                        }
                     })
-                    .catch(err => console.error(err));
-            }, 500); // Check every 500ms
+                    .catch(err => {
+                        console.error('Progress check error:', err);
+                    });
+            }, 500);
         }
         
         // Navigate between modals

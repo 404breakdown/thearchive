@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Progress Debug Test</title>
+    <style>
+        body { font-family: monospace; padding: 20px; background: #1a1a1a; color: #fff; }
+        .log { background: #2a2a2a; padding: 10px; margin: 10px 0; border-left: 3px solid #4CAF50; }
+        .error { border-left-color: #f44336; }
+        button { padding: 10px 20px; margin: 5px; cursor: pointer; }
+        #progress { width: 100%; height: 30px; background: #333; margin: 10px 0; }
+        #progressBar { height: 100%; background: #4CAF50; width: 0%; transition: width 0.3s; }
+    </style>
+</head>
+<body>
+    <h1>Archive Progress Debug Tool</h1>
+    
+    <div>
+        <label>Username to test:</label>
+        <input type="text" id="username" value="" placeholder="Enter username">
+        <button onclick="testArchive()">Test Archive Worker</button>
+        <button onclick="testProgress()">Test Progress Check</button>
+        <button onclick="clearLogs()">Clear Logs</button>
+    </div>
+    
+    <div id="progress">
+        <div id="progressBar"></div>
+    </div>
+    <div id="progressText">Ready</div>
+    
+    <h3>Console Log:</h3>
+    <div id="console"></div>
+    
+    <script>
+        function log(message, isError = false) {
+            const div = document.createElement('div');
+            div.className = 'log' + (isError ? ' error' : '');
+            div.textContent = new Date().toLocaleTimeString() + ' - ' + message;
+            document.getElementById('console').appendChild(div);
+            console.log(message);
+        }
+        
+        function clearLogs() {
+            document.getElementById('console').innerHTML = '';
+        }
+        
+        function testArchive() {
+            const username = document.getElementById('username').value;
+            if (!username) {
+                alert('Enter a username');
+                return;
+            }
+            
+            log('Starting archive test for: ' + username);
+            
+            // Create iframe
+            const iframe = document.createElement('iframe');
+            iframe.style.display = 'none';
+            iframe.src = 'archive_worker.php?user=' + encodeURIComponent(username);
+            
+            iframe.onload = function() {
+                log('✓ Iframe loaded successfully');
+            };
+            
+            iframe.onerror = function(e) {
+                log('✗ Iframe failed to load: ' + e, true);
+            };
+            
+            document.body.appendChild(iframe);
+            log('Iframe created, source: ' + iframe.src);
+            
+            // Start progress polling
+            setTimeout(() => startProgressPolling(username), 1000);
+        }
+        
+        function startProgressPolling(username) {
+            log('Starting progress polling...');
+            
+            let count = 0;
+            const interval = setInterval(function() {
+                count++;
+                
+                fetch('check_progress.php?type=archive&id=' + encodeURIComponent(username))
+                    .then(r => {
+                        log('Response status: ' + r.status);
+                        return r.json();
+                    })
+                    .then(data => {
+                        log('Progress data: ' + JSON.stringify(data));
+                        
+                        const bar = document.getElementById('progressBar');
+                        const text = document.getElementById('progressText');
+                        
+                        bar.style.width = (data.progress || 0) + '%';
+                        text.textContent = data.message || data.status || 'Unknown';
+                        
+                        if (data.status === 'complete') {
+                            clearInterval(interval);
+                            log('✓ COMPLETE!', false);
+                        }
+                        
+                        if (data.status === 'error') {
+                            clearInterval(interval);
+                            log('✗ ERROR: ' + data.message, true);
+                        }
+                        
+                        if (count > 120) { // 1 minute
+                            clearInterval(interval);
+                            log('Stopped after 1 minute', true);
+                        }
+                    })
+                    .catch(err => {
+                        log('✗ Fetch error: ' + err, true);
+                    });
+            }, 500);
+        }
+        
+        function testProgress() {
+            const username = document.getElementById('username').value;
+            if (!username) {
+                alert('Enter a username');
+                return;
+            }
+            
+            log('Testing progress check only...');
+            
+            fetch('check_progress.php?type=archive&id=' + encodeURIComponent(username))
+                .then(r => r.json())
+                .then(data => {
+                    log('Progress response: ' + JSON.stringify(data));
+                })
+                .catch(err => {
+                    log('Error: ' + err, true);
+                });
+        }
+    </script>
+</body>
+</html>
