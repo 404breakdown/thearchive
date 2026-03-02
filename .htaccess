@@ -4,8 +4,16 @@
     Deny from all
 </FilesMatch>
 
-Options -Indexes
+# Force proper MIME types for video files
+AddType video/mp4 .mp4 .m4v
+AddType video/webm .webm
+AddType video/ogg .ogv
+AddType video/quicktime .mov
 
+# Enable range requests for video streaming (required for iOS)
+Header set Accept-Ranges bytes
+
+Options -Indexes
 php_flag display_errors On
 php_value max_execution_time 300
 php_value upload_max_filesize 500M
