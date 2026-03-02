@@ -13,27 +13,11 @@ function getDirSize($dir) {
     $size = 0;
     if (!is_dir($dir)) return 0;
     
-    try {
-        $files = new RecursiveIteratorIterator(
-            new RecursiveDirectoryIterator($dir, FilesystemIterator::SKIP_DOTS),
-            RecursiveIteratorIterator::CATCH_GET_CHILD
-        );
-        
-        foreach ($files as $file) {
-            try {
-                if ($file->isFile()) {
-                    $size += $file->getSize();
-                }
-            } catch (Exception $e) {
-                // Skip files that cause errors
-                continue;
-            }
+    foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator($dir, FilesystemIterator::SKIP_DOTS)) as $file) {
+        if ($file->isFile()) {
+            $size += $file->getSize();
         }
-    } catch (Exception $e) {
-        // Return 0 if directory can't be read
-        return 0;
     }
-    
     return $size;
 }
 
@@ -74,39 +58,70 @@ $image_count = 0;
 $video_count = 0;
 $user_count = 0;
 
+// Case-insensitive folder finder
+function find_folder($base_path, $folder_name) {
+    if (!is_dir($base_path)) return null;
+    $dirs = scandir($base_path);
+    foreach ($dirs as $dir) {
+        if (strcasecmp($dir, $folder_name) === 0 && is_dir($base_path . $dir)) {
+            return $dir;
+        }
+    }
+    return null;
+}
+
+function count_files_in_folder($path, $extensions) {
+    if (!is_dir($path)) return 0;
+    $count = 0;
+    $files = array_diff(scandir($path), ['.', '..']);
+    foreach ($files as $file) {
+        if (is_file($path . $file)) {
+            $ext = strtolower(pathinfo($file, PATHINFO_EXTENSION));
+            if (in_array($ext, $extensions)) {
+                $count++;
+            }
+        }
+    }
+    return $count;
+}
+
 $allowed_img = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
-$allowed_vid = ['mp4', 'mov', 'avi', 'mkv', 'webm'];
+$allowed_vid = ['mp4', 'mov', 'webm'];
 
 if (is_dir($archive_path)) {
-    foreach (scandir($archive_path) as $user) {
-        if ($user === '.' || $user === '..') continue;
-        $user_dir = $archive_path . '/' . $user;
-        if (!is_dir($user_dir)) continue;
+    $dirs = array_diff(scandir($archive_path), ['.', '..']);
+    
+    foreach ($dirs as $dir) {
+        $dir_path = $archive_path . '/' . $dir . '/';
+        if (!is_dir($dir_path)) continue;
         
         $user_count++;
         
-        // Scan user directories with error handling
-        try {
-            $iterator = new RecursiveIteratorIterator(
-                new RecursiveDirectoryIterator($user_dir, FilesystemIterator::SKIP_DOTS),
-                RecursiveIteratorIterator::CATCH_GET_CHILD
-            );
+        // Layout 1: User/Images and User/Videos
+        $images_folder = find_folder($dir_path, 'images');
+        if ($images_folder) {
+            $image_count += count_files_in_folder($dir_path . $images_folder . '/', $allowed_img);
+        }
+        
+        $videos_folder = find_folder($dir_path, 'videos');
+        if ($videos_folder) {
+            $video_count += count_files_in_folder($dir_path . $videos_folder . '/', $allowed_vid);
+        }
+        
+        // Layout 2: User/posts/Images and User/posts/Videos
+        $posts_folder = find_folder($dir_path, 'posts');
+        if ($posts_folder) {
+            $posts_path = $dir_path . $posts_folder . '/';
             
-            foreach ($iterator as $file) {
-                try {
-                    if ($file->isFile()) {
-                        $ext = strtolower($file->getExtension());
-                        if (in_array($ext, $allowed_img)) $image_count++;
-                        if (in_array($ext, $allowed_vid)) $video_count++;
-                    }
-                } catch (Exception $e) {
-                    // Skip files that cause errors
-                    continue;
-                }
+            $posts_img_folder = find_folder($posts_path, 'images');
+            if ($posts_img_folder) {
+                $image_count += count_files_in_folder($posts_path . $posts_img_folder . '/', $allowed_img);
             }
-        } catch (Exception $e) {
-            // Skip directories that cause errors
-            continue;
+            
+            $posts_vid_folder = find_folder($posts_path, 'videos');
+            if ($posts_vid_folder) {
+                $video_count += count_files_in_folder($posts_path . $posts_vid_folder . '/', $allowed_vid);
+            }
         }
     }
 }

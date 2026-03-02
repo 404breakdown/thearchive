@@ -609,38 +609,37 @@ function format_bytes($b) {
                                                         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                                                     </div>
                                                     <div class="modal-body p-0 position-relative" style="background: #000;">
-                                                        <!-- Video Wrapper - responsive height -->
-                                                        <div style="display: flex; align-items: center; justify-content: center; min-height: 60vh; padding: 10px;">
-                                                            <!-- Previous Button -->
-                                                            <?php if ($idx > 0): ?>
-                                                            <button class="btn btn-dark position-absolute top-50 start-0 translate-middle-y ms-2 rounded-circle" 
-                                                                    style="width: 50px; height: 50px; z-index: 10; opacity: 0.8;"
-                                                                    onclick="navigateModal('vid<?php echo $idx; ?>', 'vid<?php echo $idx - 1; ?>')">
-                                                                <i class="bi bi-chevron-left"></i>
-                                                            </button>
-                                                            <?php endif; ?>
-                                                            
-                                                            <!-- Video - proper mobile support -->
+                                                        <!-- Previous Button -->
+                                                        <?php if ($idx > 0): ?>
+                                                        <button class="btn btn-dark position-absolute top-50 start-0 translate-middle-y ms-2 rounded-circle" 
+                                                                style="width: 50px; height: 50px; z-index: 10; opacity: 0.8;"
+                                                                onclick="navigateModal('vid<?php echo $idx; ?>', 'vid<?php echo $idx - 1; ?>')">
+                                                            <i class="bi bi-chevron-left"></i>
+                                                        </button>
+                                                        <?php endif; ?>
+                                                        
+                                                        <!-- Video - centered with padding -->
+                                                        <div class="text-center" style="padding: 20px;">
                                                             <video 
                                                                 id="vid-player-<?php echo $idx; ?>"
                                                                 controls 
                                                                 playsinline 
-                                                                preload="metadata"
+                                                                preload="auto"
                                                                 poster="<?php echo htmlspecialchars($vid['thumb'] ?? ''); ?>"
-                                                                style="max-height: 80vh; max-width: 100%; width: auto; height: auto;">
+                                                                style="max-height: 70vh; max-width: 100%; width: auto; height: auto;">
                                                                 <source src="<?php echo htmlspecialchars($vid['path']); ?>" type="video/mp4">
                                                                 Your browser does not support the video tag.
                                                             </video>
-                                                            
-                                                            <!-- Next Button -->
-                                                            <?php if ($idx < count($videos) - 1): ?>
-                                                            <button class="btn btn-dark position-absolute top-50 end-0 translate-middle-y me-2 rounded-circle" 
-                                                                    style="width: 50px; height: 50px; z-index: 10; opacity: 0.8;"
-                                                                    onclick="navigateModal('vid<?php echo $idx; ?>', 'vid<?php echo $idx + 1; ?>')">
-                                                                <i class="bi bi-chevron-right"></i>
-                                                            </button>
-                                                            <?php endif; ?>
                                                         </div>
+                                                        
+                                                        <!-- Next Button -->
+                                                        <?php if ($idx < count($videos) - 1): ?>
+                                                        <button class="btn btn-dark position-absolute top-50 end-0 translate-middle-y me-2 rounded-circle" 
+                                                                style="width: 50px; height: 50px; z-index: 10; opacity: 0.8;"
+                                                                onclick="navigateModal('vid<?php echo $idx; ?>', 'vid<?php echo $idx + 1; ?>')">
+                                                            <i class="bi bi-chevron-right"></i>
+                                                        </button>
+                                                        <?php endif; ?>
                                                         
                                                         <!-- Info overlay at bottom -->
                                                         <div class="position-absolute bottom-0 w-100 p-3" style="background: linear-gradient(transparent, rgba(0,0,0,0.8)); z-index: 5;">
@@ -669,14 +668,38 @@ function format_bytes($b) {
     
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        // Pause videos when modals close
+        // Video handling for mobile
         document.addEventListener('DOMContentLoaded', function() {
+            // Pause and reset videos when modals close
             document.querySelectorAll('.modal').forEach(function(modal) {
                 modal.addEventListener('hidden.bs.modal', function() {
                     const video = this.querySelector('video');
                     if (video) {
+                        console.log('Pausing video');
                         video.pause();
                         video.currentTime = 0;
+                    }
+                });
+                
+                // Log when modal opens
+                modal.addEventListener('shown.bs.modal', function() {
+                    const video = this.querySelector('video');
+                    if (video) {
+                        console.log('Video modal opened');
+                        console.log('Video src:', video.querySelector('source').src);
+                        console.log('Video readyState:', video.readyState);
+                        
+                        // Add error handler
+                        video.addEventListener('error', function(e) {
+                            console.error('Video error occurred:', e);
+                            console.error('Error code:', video.error ? video.error.code : 'unknown');
+                            console.error('Error message:', video.error ? video.error.message : 'unknown');
+                        });
+                        
+                        // Add canplay event
+                        video.addEventListener('canplay', function() {
+                            console.log('Video can play!');
+                        });
                     }
                 });
             });
