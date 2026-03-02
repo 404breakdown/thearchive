@@ -4,6 +4,8 @@
  * Usage: include 'sidebar.php';
  */
 
+// Check for setup.php warning
+$setup_warning = file_exists(__DIR__ . '/setup.php');
 ?>
 
 <!-- Sidebar Overlay for Mobile -->
@@ -21,13 +23,26 @@
 <!-- Sidebar -->
 <div class="sidebar">
     <div class="p-4">
-        <h4 class="mb-4"><i class="bi bi-archive-fill"></i> <?php echo htmlspecialchars($site_name); ?></h4>    
+        <h4 class="mb-4"><i class="bi bi-archive-fill"></i> <?php echo htmlspecialchars($site_name); ?></h4>
+        
+        <?php if ($setup_warning): ?>
+            <div class="alert alert-danger alert-sm mb-3">
+                <small><i class="bi bi-exclamation-triangle"></i> Delete setup.php!</small>
+            </div>
+        <?php endif; ?>
+        
         <nav class="nav flex-column">
             <a class="nav-link <?php echo $currentPage === 'dashboard' ? 'active' : ''; ?>" href="dashboard.php">
                 <i class="bi bi-speedometer2"></i> Dashboard
             </a>
-            <a class="nav-link <?php echo $currentPage === 'archive' ? 'active' : ''; ?>" href="archive.php">
-                <i class="bi bi-folder2-open"></i> Archive
+            <a class="nav-link <?php echo $currentPage === 'gallery' ? 'active' : ''; ?>" href="gallery.php">
+                <i class="bi bi-images"></i> Gallery
+            </a>
+            <a class="nav-link <?php echo $currentPage === 'archive' ? 'active' : ''; ?>" href="archived.php">
+                <i class="bi bi-archive"></i> Archive
+            </a>
+            <a class="nav-link <?php echo $currentPage === 'stats' ? 'active' : ''; ?>" href="stats.php">
+                <i class="bi bi-graph-up"></i> Statistics
             </a>
             <a class="nav-link <?php echo $currentPage === 'settings' ? 'active' : ''; ?>" href="settings.php">
                 <i class="bi bi-gear"></i> Settings
