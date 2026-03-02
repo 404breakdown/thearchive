@@ -143,39 +143,6 @@ if (is_dir($archive_base)) {
         }
     }
 }
-
-// Calculate total storage
-$total_storage = is_dir($archive_base) ? get_dir_size($archive_base) : 0;
-
-// Count total users, images, videos
-$total_users = 0;
-$total_images = 0;
-$total_videos = 0;
-
-$allowed_img = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
-$allowed_vid = ['mp4', 'mov', 'avi', 'mkv', 'webm'];
-
-if (is_dir($archive_base)) {
-    foreach (scandir($archive_base) as $user) {
-        if ($user === '.' || $user === '..') continue;
-        $user_dir = $archive_base . $user;
-        if (!is_dir($user_dir)) continue;
-        
-        $total_users++;
-        
-        $iterator = new RecursiveIteratorIterator(
-            new RecursiveDirectoryIterator($user_dir, RecursiveDirectoryIterator::SKIP_DOTS)
-        );
-        
-        foreach ($iterator as $file) {
-            if ($file->isFile()) {
-                $ext = strtolower($file->getExtension());
-                if (in_array($ext, $allowed_img)) $total_images++;
-                if (in_array($ext, $allowed_vid)) $total_videos++;
-            }
-        }
-    }
-}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -241,42 +208,6 @@ if (is_dir($archive_base)) {
             <div class="tab-content">
                 <!-- General Tab -->
                 <div class="tab-pane fade show active" id="general" role="tabpanel">
-                    <!-- Stats Cards -->
-                    <div class="row g-3 mb-4">
-                        <div class="col-md-3 col-6">
-                            <div class="card bg-primary text-white">
-                                <div class="card-body">
-                                    <h6 class="card-title"><i class="bi bi-hdd"></i> Total Storage</h6>
-                                    <h3 class="mb-0"><?php echo format_bytes($total_storage); ?></h3>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-3 col-6">
-                            <div class="card bg-success text-white">
-                                <div class="card-body">
-                                    <h6 class="card-title"><i class="bi bi-people"></i> Total Users</h6>
-                                    <h3 class="mb-0"><?php echo number_format($total_users); ?></h3>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-3 col-6">
-                            <div class="card bg-info text-white">
-                                <div class="card-body">
-                                    <h6 class="card-title"><i class="bi bi-image"></i> Total Images</h6>
-                                    <h3 class="mb-0"><?php echo number_format($total_images); ?></h3>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-3 col-6">
-                            <div class="card bg-warning text-dark">
-                                <div class="card-body">
-                                    <h6 class="card-title"><i class="bi bi-camera-video"></i> Total Videos</h6>
-                                    <h3 class="mb-0"><?php echo number_format($total_videos); ?></h3>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
                     <div class="row">
                         <div class="col-lg-6">
                             <div class="card">

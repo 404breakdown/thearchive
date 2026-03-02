@@ -13,16 +13,27 @@ function getDirSize($dir) {
     $size = 0;
     if (!is_dir($dir)) return 0;
     
-    $files = new RecursiveIteratorIterator(
-        new RecursiveDirectoryIterator($dir, RecursiveDirectoryIterator::SKIP_DOTS),
-        RecursiveIteratorIterator::CATCH_GET_CHILD
-    );
-    
-    foreach ($files as $file) {
-        if ($file->isFile()) {
-            $size += $file->getSize();
+    try {
+        $files = new RecursiveIteratorIterator(
+            new RecursiveDirectoryIterator($dir, FilesystemIterator::SKIP_DOTS),
+            RecursiveIteratorIterator::CATCH_GET_CHILD
+        );
+        
+        foreach ($files as $file) {
+            try {
+                if ($file->isFile()) {
+                    $size += $file->getSize();
+                }
+            } catch (Exception $e) {
+                // Skip files that cause errors
+                continue;
+            }
         }
+    } catch (Exception $e) {
+        // Return 0 if directory can't be read
+        return 0;
     }
+    
     return $size;
 }
 
@@ -74,17 +85,28 @@ if (is_dir($archive_path)) {
         
         $user_count++;
         
-        // Scan user directories
-        $iterator = new RecursiveIteratorIterator(
-            new RecursiveDirectoryIterator($user_dir, RecursiveDirectoryIterator::SKIP_DOTS)
-        );
-        
-        foreach ($iterator as $file) {
-            if ($file->isFile()) {
-                $ext = strtolower($file->getExtension());
-                if (in_array($ext, $allowed_img)) $image_count++;
-                if (in_array($ext, $allowed_vid)) $video_count++;
+        // Scan user directories with error handling
+        try {
+            $iterator = new RecursiveIteratorIterator(
+                new RecursiveDirectoryIterator($user_dir, FilesystemIterator::SKIP_DOTS),
+                RecursiveIteratorIterator::CATCH_GET_CHILD
+            );
+            
+            foreach ($iterator as $file) {
+                try {
+                    if ($file->isFile()) {
+                        $ext = strtolower($file->getExtension());
+                        if (in_array($ext, $allowed_img)) $image_count++;
+                        if (in_array($ext, $allowed_vid)) $video_count++;
+                    }
+                } catch (Exception $e) {
+                    // Skip files that cause errors
+                    continue;
+                }
             }
+        } catch (Exception $e) {
+            // Skip directories that cause errors
+            continue;
         }
     }
 }
