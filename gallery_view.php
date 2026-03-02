@@ -153,7 +153,7 @@ $images = [];
 $videos = [];
 
 $allowed_img = ['jpg','jpeg','png','gif','webp'];
-$allowed_vid = ['mp4','mov','avi','mkv','webm'];
+$allowed_vid = ['mp4','mov','webm']; // Mobile-friendly formats only
 
 // Layout 1: Dave/Images and Dave/Videos
 $images_folder = find_folder($user_dir, 'images');
@@ -620,14 +620,14 @@ function format_bytes($b) {
                                                             </button>
                                                             <?php endif; ?>
                                                             
-                                                            <!-- Video - simple approach for all devices -->
-                                                            <video id="vid-player-<?php echo $idx; ?>"
-                                                                   controls 
-                                                                   playsinline 
-                                                                   webkit-playsinline
-                                                                   preload="metadata"
-                                                                   poster="<?php echo htmlspecialchars($vid['thumb'] ?? ''); ?>"
-                                                                   style="max-height: 80vh; max-width: 100%; height: auto; width: auto; background: #000;">
+                                                            <!-- Video - proper mobile support -->
+                                                            <video 
+                                                                id="vid-player-<?php echo $idx; ?>"
+                                                                controls 
+                                                                playsinline 
+                                                                preload="metadata"
+                                                                poster="<?php echo htmlspecialchars($vid['thumb'] ?? ''); ?>"
+                                                                style="max-height: 80vh; max-width: 100%; width: auto; height: auto;">
                                                                 <source src="<?php echo htmlspecialchars($vid['path']); ?>" type="video/mp4">
                                                                 Your browser does not support the video tag.
                                                             </video>
@@ -669,29 +669,16 @@ function format_bytes($b) {
     
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        // Fix mobile video playback - aggressive reload
+        // Pause videos when modals close
         document.addEventListener('DOMContentLoaded', function() {
-            // Add event listeners to all video modals
-            document.querySelectorAll('[id^="vid"]').forEach(function(modal) {
-                if (!modal.classList.contains('modal')) return;
-                
-                const videoId = modal.id.replace('vid', 'vid-player-');
-                const video = document.getElementById(videoId);
-                
-                if (video) {
-                    modal.addEventListener('show.bs.modal', function() {
-                        // Reset and reload video when modal is about to show
+            document.querySelectorAll('.modal').forEach(function(modal) {
+                modal.addEventListener('hidden.bs.modal', function() {
+                    const video = this.querySelector('video');
+                    if (video) {
                         video.pause();
                         video.currentTime = 0;
-                        video.load(); // Force complete reload
-                    });
-                    
-                    modal.addEventListener('hidden.bs.modal', function() {
-                        // Clean up when closing
-                        video.pause();
-                        video.currentTime = 0;
-                    });
-                }
+                    }
+                });
             });
         });
         
