@@ -429,9 +429,26 @@ function format_bytes($b) {
                                     <i class="bi bi-pencil"></i> Edit Info
                                 </button>
                                 
-                                <button type="button" class="btn btn-warning btn-sm w-100 mt-2" onclick="if(confirm('Archive this user? This will zip all files and remove from gallery.')) { window.location.href='archive_user.php?user=<?php echo urlencode($archive_user); ?>'; }">
+                                <button type="button" class="btn btn-warning btn-sm w-100 mt-2" onclick="if(confirm('Archive this user? This will zip all files and remove from gallery.')) { archiveUser('<?php echo $archive_user; ?>'); }">
                                     <i class="bi bi-archive"></i> Archive User
                                 </button>
+                            </div>
+                            
+                            <!-- Archive Progress Modal -->
+                            <div class="modal fade" id="archiveProgressModal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1">
+                                <div class="modal-dialog modal-dialog-centered">
+                                    <div class="modal-content">
+                                        <div class="modal-header">
+                                            <h5 class="modal-title">Archiving User...</h5>
+                                        </div>
+                                        <div class="modal-body">
+                                            <div class="progress mb-2" style="height: 30px;">
+                                                <div id="archiveProgressBar" class="progress-bar progress-bar-striped progress-bar-animated" style="width: 0%">0%</div>
+                                            </div>
+                                            <div id="archiveProgressText" class="text-center text-muted">Starting...</div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                             
                             <!-- Edit Form (hidden by default) -->
@@ -719,6 +736,39 @@ function format_bytes($b) {
                 display.style.display = 'none';
                 edit.style.display = 'block';
             }
+        }
+        
+        // Archive user with progress
+        function archiveUser(username) {
+            const modal = new bootstrap.Modal(document.getElementById('archiveProgressModal'));
+            modal.show();
+            
+            // Start archiving in background
+            fetch('archive_user.php?user=' + encodeURIComponent(username))
+                .catch(err => console.error('Archive error:', err));
+            
+            // Poll for progress
+            const checkProgress = setInterval(function() {
+                fetch('archive_user.php?check_progress=1&user=' + encodeURIComponent(username))
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.status === 'idle') return;
+                        
+                        const progressBar = document.getElementById('archiveProgressBar');
+                        const progressText = document.getElementById('archiveProgressText');
+                        
+                        progressBar.style.width = data.progress + '%';
+                        progressBar.textContent = data.progress + '%';
+                        progressText.textContent = data.message;
+                        
+                        if (data.status === 'complete') {
+                            clearInterval(checkProgress);
+                            setTimeout(() => {
+                                window.location.href = 'gallery.php?success=User archived successfully';
+                            }, 1000);
+                        }
+                    });
+            }, 500); // Check every 500ms
         }
         
         // Navigate between modals

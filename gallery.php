@@ -580,20 +580,42 @@ function format_bytes($bytes) {
                 return;
             }
             
+            if (!confirm('Archive ' + selectedUsers.size + ' users? This will zip all files and remove from gallery.')) {
+                return;
+            }
+            
             const modal = new bootstrap.Modal(document.getElementById('bulkArchiveModal'));
             modal.show();
             
-            // Save selected users to session
+            // Save selected users to session and start processing
+            const formData = new URLSearchParams();
+            formData.append('selected_users', JSON.stringify(Array.from(selectedUsers)));
+            
             fetch('bulk_archive.php', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-                body: 'selected_users=' + encodeURIComponent(JSON.stringify(Array.from(selectedUsers)))
-            }).then(() => {
-                // Start actual archiving
-                fetch('bulk_archive.php').catch(err => console.error(err));
+                body: formData.toString()
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    // Now trigger the actual archiving in a new tab/request
+                    const iframe = document.createElement('iframe');
+                    iframe.style.display = 'none';
+                    iframe.src = 'bulk_archive.php';
+                    document.body.appendChild(iframe);
+                    
+                    // Start polling for progress
+                    pollBulkArchiveProgress();
+                }
+            })
+            .catch(err => {
+                console.error('Archive error:', err);
+                alert('Failed to start archiving');
             });
-            
-            // Poll for progress
+        }
+        
+        function pollBulkArchiveProgress() {
             const checkProgress = setInterval(function() {
                 fetch('bulk_archive.php?check_progress=1')
                     .then(r => r.json())
@@ -610,10 +632,11 @@ function format_bytes($bytes) {
                         if (data.status === 'complete') {
                             clearInterval(checkProgress);
                             setTimeout(() => {
-                                window.location.href = 'gallery.php?success=' + encodeURIComponent(data.message);
+                                window.location.href = 'gallery.php?success=' + encodeURIComponent(data.message || 'Users archived successfully');
                             }, 1000);
                         }
-                    });
+                    })
+                    .catch(err => console.error('Progress check error:', err));
             }, 500);
         }
         
@@ -623,19 +646,42 @@ function format_bytes($bytes) {
                 return;
             }
             
+            if (!confirm('Download ' + selectedUsers.size + ' users as ZIP?')) {
+                return;
+            }
+            
             const modal = new bootstrap.Modal(document.getElementById('bulkDownloadModal'));
             modal.show();
             
-            // Save selected users and start download
+            // Save selected users to session and start processing
+            const formData = new URLSearchParams();
+            formData.append('selected_users', JSON.stringify(Array.from(selectedUsers)));
+            
             fetch('bulk_download.php', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-                body: 'selected_users=' + encodeURIComponent(JSON.stringify(Array.from(selectedUsers)))
-            }).then(() => {
-                fetch('bulk_download.php').catch(err => console.error(err));
+                body: formData.toString()
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    // Trigger the actual download creation
+                    const iframe = document.createElement('iframe');
+                    iframe.style.display = 'none';
+                    iframe.src = 'bulk_download.php';
+                    document.body.appendChild(iframe);
+                    
+                    // Start polling for progress
+                    pollBulkDownloadProgress();
+                }
+            })
+            .catch(err => {
+                console.error('Download error:', err);
+                alert('Failed to start download');
             });
-            
-            // Poll for progress
+        }
+        
+        function pollBulkDownloadProgress() {
             const checkProgress = setInterval(function() {
                 fetch('bulk_download.php?check_progress=1')
                     .then(r => r.json())
@@ -653,7 +699,8 @@ function format_bytes($bytes) {
                             clearInterval(checkProgress);
                             window.location.href = 'bulk_download_ready.php?file=' + encodeURIComponent(data.download_url.split('/').pop());
                         }
-                    });
+                    })
+                    .catch(err => console.error('Progress check error:', err));
             }, 500);
         }
     </script>

@@ -131,7 +131,7 @@ function formatBytes($bytes) {
                                         <i class="bi bi-download"></i> Download
                                     </a>
                                     
-                                    <button class="btn btn-success btn-sm w-100" onclick="if(confirm('Unarchive <?php echo htmlspecialchars($user['name']); ?>? This will extract and restore to gallery.')) { window.location.href='unarchive_user.php?file=<?php echo urlencode($user['zip_file']); ?>'; }">
+                                    <button class="btn btn-success btn-sm w-100" onclick="if(confirm('Unarchive <?php echo htmlspecialchars($user['name']); ?>? This will extract and restore to gallery.')) { unarchiveUser('<?php echo urlencode($user['zip_file']); ?>'); }">
                                         <i class="bi bi-arrow-counterclockwise"></i> Unarchive
                                     </button>
                                 </div>
@@ -143,6 +143,57 @@ function formatBytes($bytes) {
         </div>
     </div>
     
+    <!-- Unarchive Progress Modal -->
+    <div class="modal fade" id="unarchiveProgressModal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Unarchiving User...</h5>
+                </div>
+                <div class="modal-body">
+                    <div class="progress mb-2" style="height: 30px;">
+                        <div id="unarchiveProgressBar" class="progress-bar progress-bar-striped progress-bar-animated bg-success" style="width: 0%">0%</div>
+                    </div>
+                    <div id="unarchiveProgressText" class="text-center text-muted">Starting...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        function unarchiveUser(filename) {
+            const modal = new bootstrap.Modal(document.getElementById('unarchiveProgressModal'));
+            modal.show();
+            
+            // Start unarchiving in background
+            fetch('unarchive_user.php?file=' + encodeURIComponent(filename))
+                .catch(err => console.error('Unarchive error:', err));
+            
+            // Poll for progress
+            const checkProgress = setInterval(function() {
+                fetch('unarchive_user.php?check_progress=1&file=' + encodeURIComponent(filename))
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.status === 'idle') return;
+                        
+                        const progressBar = document.getElementById('unarchiveProgressBar');
+                        const progressText = document.getElementById('unarchiveProgressText');
+                        
+                        progressBar.style.width = data.progress + '%';
+                        progressBar.style.width = data.progress + '%';
+                        progressBar.textContent = data.progress + '%';
+                        progressText.textContent = data.message;
+                        
+                        if (data.status === 'complete') {
+                            clearInterval(checkProgress);
+                            setTimeout(() => {
+                                window.location.href = 'archived.php?success=User unarchived successfully';
+                            }, 1000);
+                        }
+                    });
+            }, 500); // Check every 500ms
+        }
+    </script>
 </body>
 </html>

@@ -67,12 +67,26 @@ $site_name = 'TheArchive';
                         document.getElementById('progressSection').style.display = 'none';
                         document.getElementById('downloadSection').style.display = 'block';
                         
-                        // Delete file after download
-                        document.getElementById('downloadLink').addEventListener('click', function() {
+                        // Add download click handler to delete file
+                        const downloadLink = document.getElementById('downloadLink');
+                        downloadLink.addEventListener('click', function(e) {
+                            // Let download start
                             setTimeout(function() {
-                                fetch('delete_temp_file.php?file=<?php echo urlencode($filename); ?>');
-                            }, 1000); // Give download a second to start
-                        });
+                                // Then delete the file
+                                fetch('delete_temp_file.php?file=<?php echo urlencode($filename); ?>')
+                                    .then(r => r.json())
+                                    .then(result => {
+                                        if (result.success) {
+                                            // Update UI to show file deleted
+                                            downloadLink.classList.remove('btn-success');
+                                            downloadLink.classList.add('btn-secondary', 'disabled');
+                                            downloadLink.innerHTML = '<i class="bi bi-check"></i> Downloaded & Deleted';
+                                            downloadLink.removeAttribute('href');
+                                            downloadLink.removeAttribute('download');
+                                        }
+                                    });
+                            }, 2000); // Wait 2 seconds for download to start
+                        }, { once: true }); // Only fire once
                     }
                 });
         }, 500);
