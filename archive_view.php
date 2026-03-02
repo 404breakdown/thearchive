@@ -226,13 +226,26 @@ if ($posts_folder) {
     }
 }
 
-// Count missing thumbnails
+// Count missing thumbnails - only check files that actually don't have thumbnails
 $missing_thumbs = 0;
-foreach ($images as $img) {
-    if (!$img['thumb']) $missing_thumbs++;
-}
-foreach ($videos as $vid) {
-    if (!$vid['thumb']) $missing_thumbs++;
+$total_files = 0;
+
+// If we just completed generation (URL parameter), skip detection on this load
+$just_completed = isset($_GET['thumbs_done']) && $_GET['thumbs_done'] === '1';
+
+if (!$just_completed) {
+    foreach ($images as $img) {
+        $total_files++;
+        if (!$img['thumb']) {
+            $missing_thumbs++;
+        }
+    }
+    foreach ($videos as $vid) {
+        $total_files++;
+        if (!$vid['thumb']) {
+            $missing_thumbs++;
+        }
+    }
 }
 
 function format_bytes($b) {
@@ -713,7 +726,7 @@ function format_bytes($b) {
                         // Continue with next batch
                         setTimeout(() => generateThumbnails(data.processed), 100);
                     } else {
-                        // All done - reload page to show thumbnails
+                        // All done - reload with parameter to prevent re-trigger
                         const alert = document.getElementById('thumb-progress-alert');
                         if (alert) {
                             alert.classList.remove('alert-info');
@@ -721,7 +734,10 @@ function format_bytes($b) {
                             alert.innerHTML = '<i class="bi bi-check-circle"></i> <strong>Complete!</strong> Reloading...';
                         }
                         setTimeout(() => {
-                            window.location.reload();
+                            // Add parameter to URL to indicate generation just completed
+                            const url = new URL(window.location.href);
+                            url.searchParams.set('thumbs_done', '1');
+                            window.location.href = url.toString();
                         }, 1000);
                     }
                 }
