@@ -539,8 +539,8 @@ function format_bytes($b) {
                                                         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                                                     </div>
                                                     <div class="modal-body p-0 position-relative" style="background: #000;">
-                                                        <!-- Image Wrapper for proper scaling -->
-                                                        <div style="display: flex; align-items: center; justify-content: center; min-height: 70vh; max-height: 90vh; padding: 20px;">
+                                                        <!-- Image Wrapper - responsive height -->
+                                                        <div style="display: flex; align-items: center; justify-content: center; min-height: 60vh; padding: 10px;">
                                                             <!-- Previous Button -->
                                                             <?php if ($idx > 0): ?>
                                                             <button class="btn btn-dark position-absolute top-50 start-0 translate-middle-y ms-2 rounded-circle" 
@@ -550,9 +550,9 @@ function format_bytes($b) {
                                                             </button>
                                                             <?php endif; ?>
                                                             
-                                                            <!-- Image -->
+                                                            <!-- Image with viewport-based max height -->
                                                             <img src="<?php echo htmlspecialchars($img['path']); ?>" 
-                                                                 style="max-height: 100%; max-width: 100%; height: auto; width: auto; object-fit: contain;">
+                                                                 style="max-height: 80vh; max-width: 100%; height: auto; width: auto; object-fit: contain;">
                                                             
                                                             <!-- Next Button -->
                                                             <?php if ($idx < count($images) - 1): ?>
@@ -605,8 +605,8 @@ function format_bytes($b) {
                                                         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                                                     </div>
                                                     <div class="modal-body p-0 position-relative" style="background: #000;">
-                                                        <!-- Video Wrapper for proper scaling -->
-                                                        <div style="display: flex; align-items: center; justify-content: center; min-height: 70vh; max-height: 90vh; padding: 20px;">
+                                                        <!-- Video Wrapper - responsive height -->
+                                                        <div style="display: flex; align-items: center; justify-content: center; min-height: 60vh; padding: 10px;">
                                                             <!-- Previous Button -->
                                                             <?php if ($idx > 0): ?>
                                                             <button class="btn btn-dark position-absolute top-50 start-0 translate-middle-y ms-2 rounded-circle" 
@@ -616,15 +616,16 @@ function format_bytes($b) {
                                                             </button>
                                                             <?php endif; ?>
                                                             
-                                                            <!-- Video with direct src for better compatibility -->
-                                                            <video controls 
-                                                                   preload="metadata" 
+                                                            <!-- Video - try both source and src for compatibility -->
+                                                            <video id="vid-player-<?php echo $idx; ?>"
+                                                                   controls 
                                                                    playsinline 
                                                                    webkit-playsinline
-                                                                   controlsList="nodownload"
-                                                                   src="<?php echo htmlspecialchars($vid['path']); ?>"
-                                                                   type="video/mp4"
-                                                                   style="max-height: 100%; max-width: 100%; height: auto; width: auto; object-fit: contain;">
+                                                                   preload="auto"
+                                                                   poster="<?php echo htmlspecialchars($vid['thumb'] ?? ''); ?>"
+                                                                   style="max-height: 80vh; max-width: 100%; height: auto; width: auto; background: #000;">
+                                                                <source src="<?php echo htmlspecialchars($vid['path']); ?>" type="video/mp4">
+                                                                <source src="<?php echo htmlspecialchars($vid['path']); ?>" type="video/quicktime">
                                                                 Your browser does not support the video tag.
                                                             </video>
                                                             
