@@ -616,16 +616,16 @@ function format_bytes($b) {
                                                             </button>
                                                             <?php endif; ?>
                                                             
-                                                            <!-- Video - try both source and src for compatibility -->
+                                                            <!-- Video - simplified for maximum compatibility -->
                                                             <video id="vid-player-<?php echo $idx; ?>"
                                                                    controls 
                                                                    playsinline 
-                                                                   webkit-playsinline
                                                                    preload="auto"
                                                                    poster="<?php echo htmlspecialchars($vid['thumb'] ?? ''); ?>"
-                                                                   style="max-height: 80vh; max-width: 100%; height: auto; width: auto; background: #000;">
+                                                                   style="max-height: 80vh; max-width: 100%; height: auto; width: auto; background: #000;"
+                                                                   onloadeddata="console.log('Video loaded:', '<?php echo $vid['filename']; ?>')"
+                                                                   onerror="console.error('Video error:', this.error); alert('Video error: ' + (this.error ? this.error.message : 'Unknown'));">
                                                                 <source src="<?php echo htmlspecialchars($vid['path']); ?>" type="video/mp4">
-                                                                <source src="<?php echo htmlspecialchars($vid['path']); ?>" type="video/quicktime">
                                                                 Your browser does not support the video tag.
                                                             </video>
                                                             
@@ -666,6 +666,30 @@ function format_bytes($b) {
     
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+        // Fix mobile Firefox video playback
+        document.addEventListener('DOMContentLoaded', function() {
+            // Add event listeners to all video modals
+            document.querySelectorAll('[id^="vid"]').forEach(function(modal) {
+                if (!modal.classList.contains('modal')) return;
+                
+                const videoId = modal.id.replace('vid', 'vid-player-');
+                const video = document.getElementById(videoId);
+                
+                if (video) {
+                    modal.addEventListener('shown.bs.modal', function() {
+                        // Force reload when modal opens (fixes mobile Firefox)
+                        video.load();
+                    });
+                    
+                    modal.addEventListener('hidden.bs.modal', function() {
+                        // Pause and reset when closing
+                        video.pause();
+                        video.currentTime = 0;
+                    });
+                }
+            });
+        });
+        
         function toggleEdit() {
             const display = document.getElementById('info-display');
             const edit = document.getElementById('info-edit');
