@@ -3,15 +3,18 @@ session_start();
 
 // Check if already setup
 $config_file = __DIR__ . '/config.php';
-if (file_exists($config_file)) {
-    require_once $config_file;
-    
-    // Check if database exists and has admin user
-    try {
-        $db = getDB();
-        $stmt = $db->query("SELECT COUNT(*) FROM users");
-        if ($stmt->fetchColumn() > 0) {
-            // Already setup - show warning
+$setup_complete_file = __DIR__ . '/data/.setup-complete';
+
+if (file_exists($setup_complete_file) || (file_exists($config_file))) {
+    if (file_exists($config_file)) {
+        require_once $config_file;
+        
+        // Check if database exists and has admin user
+        try {
+            $db = getDB();
+            $stmt = $db->query("SELECT COUNT(*) FROM users");
+            if ($stmt->fetchColumn() > 0) {
+                // Already setup - show warning
             ?>
             <!DOCTYPE html>
             <html lang="en">
@@ -35,8 +38,8 @@ if (file_exists($config_file)) {
                                     <h3 class="mt-3">Setup Already Complete</h3>
                                     <p class="text-muted">TheArchive is already configured.</p>
                                     <hr>
-                                    <p class="small text-danger">
-                                        <strong>Security Warning:</strong> Please delete <code>setup.php</code> from your server for security.
+                                    <p class="small text-success">
+                                        <strong><i class="bi bi-shield-check"></i> Secure:</strong> Setup is permanently disabled and cannot be run again.
                                     </p>
                                     <a href="index.php" class="btn btn-primary">Go to Login</a>
                                 </div>
@@ -168,6 +171,9 @@ CONFIGPHP;
                 mkdir($archive_dir, 0755, true);
             }
             
+            // Create setup complete flag
+            file_put_contents(__DIR__ . '/data/.setup-complete', date('Y-m-d H:i:s'));
+            
             $success = 'Setup complete! Redirecting to login...';
             header('Refresh: 2; URL=index.php');
             
@@ -284,7 +290,7 @@ CONFIGPHP;
                 
                 <div class="text-center mt-3">
                     <small class="text-white">
-                        <i class="bi bi-shield-check"></i> After setup, please delete setup.php for security
+                        <i class="bi bi-shield-check"></i> Setup will automatically disable after completion
                     </small>
                 </div>
             </div>
