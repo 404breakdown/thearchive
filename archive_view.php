@@ -491,15 +491,17 @@ function format_bytes($b) {
                                             </div>
                                         </div>
                                         <div class="modal fade" id="im<?php echo $idx; ?>" tabindex="-1">
-                                            <div class="modal-dialog modal-lg modal-dialog-centered">
+                                            <div class="modal-dialog modal-fullscreen-lg-down modal-xl modal-dialog-centered modal-dialog-scrollable">
                                                 <div class="modal-content">
                                                     <div class="modal-header">
                                                         <h5 class="modal-title"><?php echo htmlspecialchars($img['filename']); ?></h5>
                                                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                                                     </div>
-                                                    <div class="modal-body text-center">
-                                                        <img src="<?php echo htmlspecialchars($img['path']); ?>" class="img-fluid">
-                                                        <div class="mt-2 text-muted small">Size: <?php echo format_bytes($img['size']); ?></div>
+                                                    <div class="modal-body text-center p-0">
+                                                        <img src="<?php echo htmlspecialchars($img['path']); ?>" class="img-fluid" style="max-height: 85vh; width: auto; max-width: 100%; object-fit: contain;">
+                                                        <div class="p-3">
+                                                            <div class="text-muted small">Size: <?php echo format_bytes($img['size']); ?></div>
+                                                        </div>
                                                     </div>
                                                     <div class="modal-footer">
                                                         <a href="<?php echo htmlspecialchars($img['path']); ?>" download class="btn btn-primary"><i class="bi bi-download"></i> Download</a>
@@ -526,15 +528,17 @@ function format_bytes($b) {
                                             </div>
                                         </div>
                                         <div class="modal fade" id="vid<?php echo $idx; ?>" tabindex="-1">
-                                            <div class="modal-dialog modal-lg modal-dialog-centered">
+                                            <div class="modal-dialog modal-fullscreen-lg-down modal-xl modal-dialog-centered modal-dialog-scrollable">
                                                 <div class="modal-content">
                                                     <div class="modal-header">
                                                         <h5 class="modal-title"><?php echo htmlspecialchars($vid['filename']); ?></h5>
                                                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                                                     </div>
-                                                    <div class="modal-body text-center">
-                                                        <video controls class="w-100"><source src="<?php echo htmlspecialchars($vid['path']); ?>"></video>
-                                                        <div class="mt-2 text-muted small">Size: <?php echo format_bytes($vid['size']); ?></div>
+                                                    <div class="modal-body text-center p-0">
+                                                        <video controls class="w-100" style="max-height: 85vh; object-fit: contain;"><source src="<?php echo htmlspecialchars($vid['path']); ?>"></video>
+                                                        <div class="p-3">
+                                                            <div class="text-muted small">Size: <?php echo format_bytes($vid['size']); ?></div>
+                                                        </div>
                                                     </div>
                                                     <div class="modal-footer">
                                                         <a href="<?php echo htmlspecialchars($vid['path']); ?>" download class="btn btn-primary"><i class="bi bi-download"></i> Download</a>
