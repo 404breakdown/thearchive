@@ -538,28 +538,31 @@ function format_bytes($b) {
                                                         <h5 class="modal-title"><?php echo htmlspecialchars($img['filename']); ?></h5>
                                                         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                                                     </div>
-                                                    <div class="modal-body p-0 position-relative" style="display: flex; align-items: center; justify-content: center; min-height: 50vh; max-height: 85vh; background: #000;">
-                                                        <!-- Previous Button -->
-                                                        <?php if ($idx > 0): ?>
-                                                        <button class="btn btn-dark position-absolute top-50 start-0 translate-middle-y ms-2 rounded-circle" 
-                                                                style="width: 50px; height: 50px; z-index: 10; opacity: 0.8;"
-                                                                onclick="navigateModal('im<?php echo $idx; ?>', 'im<?php echo $idx - 1; ?>')">
-                                                            <i class="bi bi-chevron-left"></i>
-                                                        </button>
-                                                        <?php endif; ?>
-                                                        
-                                                        <!-- Image -->
-                                                        <img src="<?php echo htmlspecialchars($img['path']); ?>" 
-                                                             style="max-height: 85vh; max-width: 100%; object-fit: contain;">
-                                                        
-                                                        <!-- Next Button -->
-                                                        <?php if ($idx < count($images) - 1): ?>
-                                                        <button class="btn btn-dark position-absolute top-50 end-0 translate-middle-y me-2 rounded-circle" 
-                                                                style="width: 50px; height: 50px; z-index: 10; opacity: 0.8;"
-                                                                onclick="navigateModal('im<?php echo $idx; ?>', 'im<?php echo $idx + 1; ?>')">
-                                                            <i class="bi bi-chevron-right"></i>
-                                                        </button>
-                                                        <?php endif; ?>
+                                                    <div class="modal-body p-0 position-relative" style="background: #000;">
+                                                        <!-- Image Wrapper for proper scaling -->
+                                                        <div style="display: flex; align-items: center; justify-content: center; min-height: 70vh; max-height: 90vh; padding: 20px;">
+                                                            <!-- Previous Button -->
+                                                            <?php if ($idx > 0): ?>
+                                                            <button class="btn btn-dark position-absolute top-50 start-0 translate-middle-y ms-2 rounded-circle" 
+                                                                    style="width: 50px; height: 50px; z-index: 10; opacity: 0.8;"
+                                                                    onclick="navigateModal('im<?php echo $idx; ?>', 'im<?php echo $idx - 1; ?>')">
+                                                                <i class="bi bi-chevron-left"></i>
+                                                            </button>
+                                                            <?php endif; ?>
+                                                            
+                                                            <!-- Image -->
+                                                            <img src="<?php echo htmlspecialchars($img['path']); ?>" 
+                                                                 style="max-height: 100%; max-width: 100%; height: auto; width: auto; object-fit: contain;">
+                                                            
+                                                            <!-- Next Button -->
+                                                            <?php if ($idx < count($images) - 1): ?>
+                                                            <button class="btn btn-dark position-absolute top-50 end-0 translate-middle-y me-2 rounded-circle" 
+                                                                    style="width: 50px; height: 50px; z-index: 10; opacity: 0.8;"
+                                                                    onclick="navigateModal('im<?php echo $idx; ?>', 'im<?php echo $idx + 1; ?>')">
+                                                                <i class="bi bi-chevron-right"></i>
+                                                            </button>
+                                                            <?php endif; ?>
+                                                        </div>
                                                         
                                                         <!-- Info overlay at bottom -->
                                                         <div class="position-absolute bottom-0 w-100 p-3" style="background: linear-gradient(transparent, rgba(0,0,0,0.8)); z-index: 5;">
@@ -601,31 +604,39 @@ function format_bytes($b) {
                                                         <h5 class="modal-title"><?php echo htmlspecialchars($vid['filename']); ?></h5>
                                                         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                                                     </div>
-                                                    <div class="modal-body p-0 position-relative" style="display: flex; align-items: center; justify-content: center; min-height: 50vh; max-height: 85vh; background: #000;">
-                                                        <!-- Previous Button -->
-                                                        <?php if ($idx > 0): ?>
-                                                        <button class="btn btn-dark position-absolute top-50 start-0 translate-middle-y ms-2 rounded-circle" 
-                                                                style="width: 50px; height: 50px; z-index: 10; opacity: 0.8;"
-                                                                onclick="navigateModal('vid<?php echo $idx; ?>', 'vid<?php echo $idx - 1; ?>')">
-                                                            <i class="bi bi-chevron-left"></i>
-                                                        </button>
-                                                        <?php endif; ?>
-                                                        
-                                                        <!-- Video -->
-                                                        <video controls preload="metadata" playsinline 
-                                                               style="max-height: 85vh; max-width: 100%; object-fit: contain;">
-                                                            <source src="<?php echo htmlspecialchars($vid['path']); ?>" type="video/mp4">
-                                                            Your browser does not support the video tag.
-                                                        </video>
-                                                        
-                                                        <!-- Next Button -->
-                                                        <?php if ($idx < count($videos) - 1): ?>
-                                                        <button class="btn btn-dark position-absolute top-50 end-0 translate-middle-y me-2 rounded-circle" 
-                                                                style="width: 50px; height: 50px; z-index: 10; opacity: 0.8;"
-                                                                onclick="navigateModal('vid<?php echo $idx; ?>', 'vid<?php echo $idx + 1; ?>')">
-                                                            <i class="bi bi-chevron-right"></i>
-                                                        </button>
-                                                        <?php endif; ?>
+                                                    <div class="modal-body p-0 position-relative" style="background: #000;">
+                                                        <!-- Video Wrapper for proper scaling -->
+                                                        <div style="display: flex; align-items: center; justify-content: center; min-height: 70vh; max-height: 90vh; padding: 20px;">
+                                                            <!-- Previous Button -->
+                                                            <?php if ($idx > 0): ?>
+                                                            <button class="btn btn-dark position-absolute top-50 start-0 translate-middle-y ms-2 rounded-circle" 
+                                                                    style="width: 50px; height: 50px; z-index: 10; opacity: 0.8;"
+                                                                    onclick="navigateModal('vid<?php echo $idx; ?>', 'vid<?php echo $idx - 1; ?>')">
+                                                                <i class="bi bi-chevron-left"></i>
+                                                            </button>
+                                                            <?php endif; ?>
+                                                            
+                                                            <!-- Video with direct src for better compatibility -->
+                                                            <video controls 
+                                                                   preload="metadata" 
+                                                                   playsinline 
+                                                                   webkit-playsinline
+                                                                   controlsList="nodownload"
+                                                                   src="<?php echo htmlspecialchars($vid['path']); ?>"
+                                                                   type="video/mp4"
+                                                                   style="max-height: 100%; max-width: 100%; height: auto; width: auto; object-fit: contain;">
+                                                                Your browser does not support the video tag.
+                                                            </video>
+                                                            
+                                                            <!-- Next Button -->
+                                                            <?php if ($idx < count($videos) - 1): ?>
+                                                            <button class="btn btn-dark position-absolute top-50 end-0 translate-middle-y me-2 rounded-circle" 
+                                                                    style="width: 50px; height: 50px; z-index: 10; opacity: 0.8;"
+                                                                    onclick="navigateModal('vid<?php echo $idx; ?>', 'vid<?php echo $idx + 1; ?>')">
+                                                                <i class="bi bi-chevron-right"></i>
+                                                            </button>
+                                                            <?php endif; ?>
+                                                        </div>
                                                         
                                                         <!-- Info overlay at bottom -->
                                                         <div class="position-absolute bottom-0 w-100 p-3" style="background: linear-gradient(transparent, rgba(0,0,0,0.8)); z-index: 5;">
