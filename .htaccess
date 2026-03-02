@@ -11,7 +11,10 @@ AddType video/ogg .ogv
 AddType video/quicktime .mov
 
 # Enable range requests for video streaming (required for iOS)
-Header set Accept-Ranges bytes
+# Only if mod_headers is available
+<IfModule mod_headers.c>
+    Header set Accept-Ranges bytes
+</IfModule>
 
 Options -Indexes
 php_flag display_errors On
