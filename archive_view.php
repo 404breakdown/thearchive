@@ -257,15 +257,43 @@ function format_bytes($b) {
         .gallery-item:hover img { transform:scale(1.05); }
         .video-indicator { position:absolute; top:10px; right:10px; background:rgba(0,0,0,0.7); padding:5px 10px; border-radius:4px; }
         .user-sidebar { position:sticky; top:20px; }
-        @media (max-width:768px) { .user-sidebar { position:relative; top:0; } }
-    </style>
-    <style>
-        .gallery-item { position:relative; overflow:hidden; border-radius:8px; aspect-ratio:1; background:#1a1a1a; cursor:pointer; }
-        .gallery-item img { width:100%; height:100%; object-fit:cover; transition:transform 0.3s; }
-        .gallery-item:hover img { transform:scale(1.05); }
-        .video-indicator { position:absolute; top:10px; right:10px; background:rgba(0,0,0,0.7); padding:5px 10px; border-radius:4px; }
-        .user-sidebar { position:sticky; top:20px; }
-        @media (max-width:768px) { .user-sidebar { position:relative; top:0; } }
+        
+        /* Modal improvements */
+        .modal-fullscreen-lg-down .modal-header {
+            background: rgba(0, 0, 0, 0.9);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .modal-fullscreen-lg-down .modal-footer {
+            background: rgba(0, 0, 0, 0.9);
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        /* Make close button more visible on mobile */
+        .btn-close-white {
+            filter: brightness(0) invert(1);
+        }
+        
+        /* Navigation arrow hover effects */
+        .modal-body button.btn-dark:hover {
+            opacity: 1 !important;
+            transform: translateY(-50%) scale(1.1);
+        }
+        
+        @media (max-width:768px) { 
+            .user-sidebar { position:relative; top:0; }
+            
+            /* Ensure close button is always visible on mobile */
+            .modal-header .btn-close {
+                font-size: 1.5rem;
+                padding: 1rem;
+            }
+            
+            /* Make navigation arrows easier to tap on mobile */
+            .modal-body button.btn-dark {
+                width: 60px !important;
+                height: 60px !important;
+            }
+        }
     </style>
 </head>
 <body>
@@ -495,15 +523,39 @@ function format_bytes($b) {
                                                 <div class="modal-content">
                                                     <div class="modal-header">
                                                         <h5 class="modal-title"><?php echo htmlspecialchars($img['filename']); ?></h5>
-                                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                                                     </div>
-                                                    <div class="modal-body text-center p-0">
+                                                    <div class="modal-body text-center p-0 position-relative">
+                                                        <!-- Previous Button -->
+                                                        <?php if ($idx > 0): ?>
+                                                        <button class="btn btn-dark position-absolute top-50 start-0 translate-middle-y ms-2 rounded-circle" 
+                                                                style="width: 50px; height: 50px; z-index: 10; opacity: 0.8;"
+                                                                onclick="navigateModal('im<?php echo $idx; ?>', 'im<?php echo $idx - 1; ?>')">
+                                                            <i class="bi bi-chevron-left"></i>
+                                                        </button>
+                                                        <?php endif; ?>
+                                                        
+                                                        <!-- Image -->
                                                         <img src="<?php echo htmlspecialchars($img['path']); ?>" class="img-fluid" style="max-height: 85vh; width: auto; max-width: 100%; object-fit: contain;">
+                                                        
+                                                        <!-- Next Button -->
+                                                        <?php if ($idx < count($images) - 1): ?>
+                                                        <button class="btn btn-dark position-absolute top-50 end-0 translate-middle-y me-2 rounded-circle" 
+                                                                style="width: 50px; height: 50px; z-index: 10; opacity: 0.8;"
+                                                                onclick="navigateModal('im<?php echo $idx; ?>', 'im<?php echo $idx + 1; ?>')">
+                                                            <i class="bi bi-chevron-right"></i>
+                                                        </button>
+                                                        <?php endif; ?>
+                                                        
                                                         <div class="p-3">
-                                                            <div class="text-muted small">Size: <?php echo format_bytes($img['size']); ?></div>
+                                                            <div class="text-muted small">
+                                                                Image <?php echo $idx + 1; ?> of <?php echo count($images); ?> • 
+                                                                Size: <?php echo format_bytes($img['size']); ?>
+                                                            </div>
                                                         </div>
                                                     </div>
                                                     <div class="modal-footer">
+                                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                                                         <a href="<?php echo htmlspecialchars($img['path']); ?>" download class="btn btn-primary"><i class="bi bi-download"></i> Download</a>
                                                     </div>
                                                 </div>
@@ -532,15 +584,39 @@ function format_bytes($b) {
                                                 <div class="modal-content">
                                                     <div class="modal-header">
                                                         <h5 class="modal-title"><?php echo htmlspecialchars($vid['filename']); ?></h5>
-                                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                                                     </div>
-                                                    <div class="modal-body text-center p-0">
+                                                    <div class="modal-body text-center p-0 position-relative">
+                                                        <!-- Previous Button -->
+                                                        <?php if ($idx > 0): ?>
+                                                        <button class="btn btn-dark position-absolute top-50 start-0 translate-middle-y ms-2 rounded-circle" 
+                                                                style="width: 50px; height: 50px; z-index: 10; opacity: 0.8;"
+                                                                onclick="navigateModal('vid<?php echo $idx; ?>', 'vid<?php echo $idx - 1; ?>')">
+                                                            <i class="bi bi-chevron-left"></i>
+                                                        </button>
+                                                        <?php endif; ?>
+                                                        
+                                                        <!-- Video -->
                                                         <video controls class="w-100" style="max-height: 85vh; object-fit: contain;"><source src="<?php echo htmlspecialchars($vid['path']); ?>"></video>
+                                                        
+                                                        <!-- Next Button -->
+                                                        <?php if ($idx < count($videos) - 1): ?>
+                                                        <button class="btn btn-dark position-absolute top-50 end-0 translate-middle-y me-2 rounded-circle" 
+                                                                style="width: 50px; height: 50px; z-index: 10; opacity: 0.8;"
+                                                                onclick="navigateModal('vid<?php echo $idx; ?>', 'vid<?php echo $idx + 1; ?>')">
+                                                            <i class="bi bi-chevron-right"></i>
+                                                        </button>
+                                                        <?php endif; ?>
+                                                        
                                                         <div class="p-3">
-                                                            <div class="text-muted small">Size: <?php echo format_bytes($vid['size']); ?></div>
+                                                            <div class="text-muted small">
+                                                                Video <?php echo $idx + 1; ?> of <?php echo count($videos); ?> • 
+                                                                Size: <?php echo format_bytes($vid['size']); ?>
+                                                            </div>
                                                         </div>
                                                     </div>
                                                     <div class="modal-footer">
+                                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                                                         <a href="<?php echo htmlspecialchars($vid['path']); ?>" download class="btn btn-primary"><i class="bi bi-download"></i> Download</a>
                                                     </div>
                                                 </div>
@@ -570,6 +646,50 @@ function format_bytes($b) {
                 edit.style.display = 'block';
             }
         }
+        
+        // Navigate between modals
+        function navigateModal(currentId, nextId) {
+            // Hide current modal
+            const currentModal = bootstrap.Modal.getInstance(document.getElementById(currentId));
+            if (currentModal) {
+                currentModal.hide();
+            }
+            
+            // Show next modal after a brief delay
+            setTimeout(() => {
+                const nextModal = new bootstrap.Modal(document.getElementById(nextId));
+                nextModal.show();
+            }, 300);
+        }
+        
+        // Keyboard navigation
+        document.addEventListener('keydown', function(e) {
+            // Check if any modal is open
+            const openModal = document.querySelector('.modal.show');
+            if (!openModal) return;
+            
+            const modalId = openModal.id;
+            
+            // ESC key - close modal (Bootstrap handles this by default)
+            // LEFT arrow key
+            if (e.key === 'ArrowLeft') {
+                e.preventDefault();
+                const prevBtn = openModal.querySelector('button[onclick*="navigateModal"]');
+                if (prevBtn && prevBtn.textContent.includes('chevron-left')) {
+                    prevBtn.click();
+                }
+            }
+            
+            // RIGHT arrow key
+            if (e.key === 'ArrowRight') {
+                e.preventDefault();
+                const buttons = openModal.querySelectorAll('button[onclick*="navigateModal"]');
+                const nextBtn = buttons.length === 2 ? buttons[1] : buttons[0];
+                if (nextBtn && nextBtn.textContent.includes('chevron-right')) {
+                    nextBtn.click();
+                }
+            }
+        });
         
         <?php if($missing_thumbs > 0): ?>
         // Async thumbnail generation with auto-reload
