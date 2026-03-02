@@ -4,8 +4,6 @@
  * Usage: include 'sidebar.php';
  */
 
-// Check for setup.php warning
-$setup_warning = file_exists(__DIR__ . '/setup.php');
 ?>
 
 <!-- Sidebar Overlay for Mobile -->
@@ -23,14 +21,7 @@ $setup_warning = file_exists(__DIR__ . '/setup.php');
 <!-- Sidebar -->
 <div class="sidebar">
     <div class="p-4">
-        <h4 class="mb-4"><i class="bi bi-archive-fill"></i> <?php echo htmlspecialchars($site_name); ?></h4>
-        
-        <?php if ($setup_warning): ?>
-            <div class="alert alert-danger alert-sm mb-3">
-                <small><i class="bi bi-exclamation-triangle"></i> Delete setup.php!</small>
-            </div>
-        <?php endif; ?>
-        
+        <h4 class="mb-4"><i class="bi bi-archive-fill"></i> <?php echo htmlspecialchars($site_name); ?></h4>    
         <nav class="nav flex-column">
             <a class="nav-link <?php echo $currentPage === 'dashboard' ? 'active' : ''; ?>" href="dashboard.php">
                 <i class="bi bi-speedometer2"></i> Dashboard
