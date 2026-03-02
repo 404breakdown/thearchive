@@ -743,31 +743,35 @@ function format_bytes($b) {
             const modal = new bootstrap.Modal(document.getElementById('archiveProgressModal'));
             modal.show();
             
-            // Start archiving in background
-            fetch('archive_user.php?user=' + encodeURIComponent(username))
-                .catch(err => console.error('Archive error:', err));
+            // Trigger archiving in background using iframe
+            const iframe = document.createElement('iframe');
+            iframe.style.display = 'none';
+            iframe.src = 'archive_worker.php?user=' + encodeURIComponent(username);
+            document.body.appendChild(iframe);
             
             // Poll for progress
             const checkProgress = setInterval(function() {
                 fetch('archive_user.php?check_progress=1&user=' + encodeURIComponent(username))
                     .then(r => r.json())
                     .then(data => {
-                        if (data.status === 'idle') return;
-                        
                         const progressBar = document.getElementById('archiveProgressBar');
                         const progressText = document.getElementById('archiveProgressText');
                         
-                        progressBar.style.width = data.progress + '%';
-                        progressBar.textContent = data.progress + '%';
-                        progressText.textContent = data.message;
+                        if (data.status !== 'idle') {
+                            progressBar.style.width = data.progress + '%';
+                            progressBar.textContent = data.progress + '%';
+                            progressText.textContent = data.message;
+                        }
                         
                         if (data.status === 'complete') {
                             clearInterval(checkProgress);
+                            document.body.removeChild(iframe);
                             setTimeout(() => {
                                 window.location.href = 'gallery.php?success=User archived successfully';
                             }, 1000);
                         }
-                    });
+                    })
+                    .catch(err => console.error(err));
             }, 500); // Check every 500ms
         }
         

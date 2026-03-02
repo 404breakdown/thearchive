@@ -587,7 +587,7 @@ function format_bytes($bytes) {
             const modal = new bootstrap.Modal(document.getElementById('bulkArchiveModal'));
             modal.show();
             
-            // Save selected users to session and start processing
+            // Save selected users to session
             const formData = new URLSearchParams();
             formData.append('selected_users', JSON.stringify(Array.from(selectedUsers)));
             
@@ -599,14 +599,14 @@ function format_bytes($bytes) {
             .then(r => r.json())
             .then(data => {
                 if (data.success) {
-                    // Now trigger the actual archiving in a new tab/request
+                    // Trigger worker in iframe
                     const iframe = document.createElement('iframe');
                     iframe.style.display = 'none';
-                    iframe.src = 'bulk_archive.php';
+                    iframe.src = 'bulk_archive_worker.php';
                     document.body.appendChild(iframe);
                     
-                    // Start polling for progress
-                    pollBulkArchiveProgress();
+                    // Start polling
+                    pollBulkArchiveProgress(iframe);
                 }
             })
             .catch(err => {
@@ -615,22 +615,23 @@ function format_bytes($bytes) {
             });
         }
         
-        function pollBulkArchiveProgress() {
+        function pollBulkArchiveProgress(iframe) {
             const checkProgress = setInterval(function() {
                 fetch('bulk_archive.php?check_progress=1')
                     .then(r => r.json())
                     .then(data => {
-                        if (data.status === 'idle') return;
-                        
                         const progressBar = document.getElementById('bulkArchiveProgressBar');
                         const progressText = document.getElementById('bulkArchiveProgressText');
                         
-                        progressBar.style.width = data.progress + '%';
-                        progressBar.textContent = data.progress + '%';
-                        progressText.textContent = data.message;
+                        if (data.status !== 'idle') {
+                            progressBar.style.width = data.progress + '%';
+                            progressBar.textContent = data.progress + '%';
+                            progressText.textContent = data.message;
+                        }
                         
                         if (data.status === 'complete') {
                             clearInterval(checkProgress);
+                            if (iframe && iframe.parentNode) document.body.removeChild(iframe);
                             setTimeout(() => {
                                 window.location.href = 'gallery.php?success=' + encodeURIComponent(data.message || 'Users archived successfully');
                             }, 1000);
@@ -653,7 +654,7 @@ function format_bytes($bytes) {
             const modal = new bootstrap.Modal(document.getElementById('bulkDownloadModal'));
             modal.show();
             
-            // Save selected users to session and start processing
+            // Save selected users to session
             const formData = new URLSearchParams();
             formData.append('selected_users', JSON.stringify(Array.from(selectedUsers)));
             
@@ -665,14 +666,14 @@ function format_bytes($bytes) {
             .then(r => r.json())
             .then(data => {
                 if (data.success) {
-                    // Trigger the actual download creation
+                    // Trigger worker in iframe
                     const iframe = document.createElement('iframe');
                     iframe.style.display = 'none';
-                    iframe.src = 'bulk_download.php';
+                    iframe.src = 'bulk_download_worker.php';
                     document.body.appendChild(iframe);
                     
-                    // Start polling for progress
-                    pollBulkDownloadProgress();
+                    // Start polling
+                    pollBulkDownloadProgress(iframe);
                 }
             })
             .catch(err => {
@@ -681,22 +682,23 @@ function format_bytes($bytes) {
             });
         }
         
-        function pollBulkDownloadProgress() {
+        function pollBulkDownloadProgress(iframe) {
             const checkProgress = setInterval(function() {
                 fetch('bulk_download.php?check_progress=1')
                     .then(r => r.json())
                     .then(data => {
-                        if (data.status === 'idle') return;
-                        
                         const progressBar = document.getElementById('bulkDownloadProgressBar');
                         const progressText = document.getElementById('bulkDownloadProgressText');
                         
-                        progressBar.style.width = data.progress + '%';
-                        progressBar.textContent = data.progress + '%';
-                        progressText.textContent = data.message;
+                        if (data.status !== 'idle') {
+                            progressBar.style.width = data.progress + '%';
+                            progressBar.textContent = data.progress + '%';
+                            progressText.textContent = data.message;
+                        }
                         
                         if (data.status === 'complete') {
                             clearInterval(checkProgress);
+                            if (iframe && iframe.parentNode) document.body.removeChild(iframe);
                             window.location.href = 'bulk_download_ready.php?file=' + encodeURIComponent(data.download_url.split('/').pop());
                         }
                     })

@@ -166,32 +166,35 @@ function formatBytes($bytes) {
             const modal = new bootstrap.Modal(document.getElementById('unarchiveProgressModal'));
             modal.show();
             
-            // Start unarchiving in background
-            fetch('unarchive_user.php?file=' + encodeURIComponent(filename))
-                .catch(err => console.error('Unarchive error:', err));
+            // Trigger unarchiving in background using iframe
+            const iframe = document.createElement('iframe');
+            iframe.style.display = 'none';
+            iframe.src = 'unarchive_worker.php?file=' + encodeURIComponent(filename);
+            document.body.appendChild(iframe);
             
             // Poll for progress
             const checkProgress = setInterval(function() {
                 fetch('unarchive_user.php?check_progress=1&file=' + encodeURIComponent(filename))
                     .then(r => r.json())
                     .then(data => {
-                        if (data.status === 'idle') return;
-                        
                         const progressBar = document.getElementById('unarchiveProgressBar');
                         const progressText = document.getElementById('unarchiveProgressText');
                         
-                        progressBar.style.width = data.progress + '%';
-                        progressBar.style.width = data.progress + '%';
-                        progressBar.textContent = data.progress + '%';
-                        progressText.textContent = data.message;
+                        if (data.status !== 'idle') {
+                            progressBar.style.width = data.progress + '%';
+                            progressBar.textContent = data.progress + '%';
+                            progressText.textContent = data.message;
+                        }
                         
                         if (data.status === 'complete') {
                             clearInterval(checkProgress);
+                            document.body.removeChild(iframe);
                             setTimeout(() => {
                                 window.location.href = 'archived.php?success=User unarchived successfully';
                             }, 1000);
                         }
-                    });
+                    })
+                    .catch(err => console.error(err));
             }, 500); // Check every 500ms
         }
     </script>
