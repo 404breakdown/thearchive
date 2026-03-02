@@ -4,8 +4,14 @@
  * Usage: include 'sidebar.php';
  */
 
-// Check for setup.php warning
-$setup_warning = file_exists(__DIR__ . '/setup.php');
+// Get site name from config
+$site_name = getSetting('site_name', 'TheArchive');
+
+// Get username from session
+$username = $_SESSION['username'] ?? 'User';
+
+// Check for setup.php warning - REMOVED, not needed anymore
+$setup_warning = false; // Disabled
 ?>
 
 <!-- Sidebar Overlay for Mobile -->

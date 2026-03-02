@@ -620,30 +620,17 @@ function format_bytes($b) {
                                                             </button>
                                                             <?php endif; ?>
                                                             
-                                                            <!-- Video - use iframe for mobile compatibility -->
-                                                            <?php 
-                                                            // Detect mobile
-                                                            $is_mobile = preg_match('/(android|iphone|ipad|mobile)/i', $_SERVER['HTTP_USER_AGENT'] ?? '');
-                                                            ?>
-                                                            
-                                                            <?php if ($is_mobile): ?>
-                                                                <!-- Mobile: Use iframe to video file directly -->
-                                                                <iframe src="<?php echo htmlspecialchars($vid['path']); ?>" 
-                                                                        style="max-height: 80vh; max-width: 100%; width: 100%; height: 70vh; border: none; background: #000;"
-                                                                        allow="autoplay; fullscreen">
-                                                                </iframe>
-                                                            <?php else: ?>
-                                                                <!-- Desktop: Use video element -->
-                                                                <video id="vid-player-<?php echo $idx; ?>"
-                                                                       controls 
-                                                                       playsinline 
-                                                                       preload="auto"
-                                                                       poster="<?php echo htmlspecialchars($vid['thumb'] ?? ''); ?>"
-                                                                       style="max-height: 80vh; max-width: 100%; height: auto; width: auto; background: #000;">
-                                                                    <source src="<?php echo htmlspecialchars($vid['path']); ?>" type="video/mp4">
-                                                                    Your browser does not support the video tag.
-                                                                </video>
-                                                            <?php endif; ?>
+                                                            <!-- Video - simple approach for all devices -->
+                                                            <video id="vid-player-<?php echo $idx; ?>"
+                                                                   controls 
+                                                                   playsinline 
+                                                                   webkit-playsinline
+                                                                   preload="metadata"
+                                                                   poster="<?php echo htmlspecialchars($vid['thumb'] ?? ''); ?>"
+                                                                   style="max-height: 80vh; max-width: 100%; height: auto; width: auto; background: #000;">
+                                                                <source src="<?php echo htmlspecialchars($vid['path']); ?>" type="video/mp4">
+                                                                Your browser does not support the video tag.
+                                                            </video>
                                                             
                                                             <!-- Next Button -->
                                                             <?php if ($idx < count($videos) - 1): ?>
@@ -682,7 +669,7 @@ function format_bytes($b) {
     
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        // Fix mobile Firefox video playback
+        // Fix mobile video playback - aggressive reload
         document.addEventListener('DOMContentLoaded', function() {
             // Add event listeners to all video modals
             document.querySelectorAll('[id^="vid"]').forEach(function(modal) {
@@ -692,13 +679,15 @@ function format_bytes($b) {
                 const video = document.getElementById(videoId);
                 
                 if (video) {
-                    modal.addEventListener('shown.bs.modal', function() {
-                        // Force reload when modal opens (fixes mobile Firefox)
-                        video.load();
+                    modal.addEventListener('show.bs.modal', function() {
+                        // Reset and reload video when modal is about to show
+                        video.pause();
+                        video.currentTime = 0;
+                        video.load(); // Force complete reload
                     });
                     
                     modal.addEventListener('hidden.bs.modal', function() {
-                        // Pause and reset when closing
+                        // Clean up when closing
                         video.pause();
                         video.currentTime = 0;
                     });
