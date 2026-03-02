@@ -623,11 +623,11 @@ function format_bytes($b) {
                                                             <video 
                                                                 id="vid-player-<?php echo $idx; ?>"
                                                                 controls 
-                                                                playsinline 
-                                                                preload="auto"
+                                                                playsinline
                                                                 poster="<?php echo htmlspecialchars($vid['thumb'] ?? ''); ?>"
-                                                                style="max-height: 70vh; max-width: 100%; width: auto; height: auto;">
-                                                                <source src="<?php echo htmlspecialchars($vid['path']); ?>" type="video/mp4">
+                                                                data-src="<?php echo htmlspecialchars($vid['path']); ?>"
+                                                                style="max-height: 70vh; max-width: 100%; width: auto; height: auto; display: block; margin: 0 auto;">
+                                                                <!-- Source will be added dynamically when modal opens -->
                                                                 Your browser does not support the video tag.
                                                             </video>
                                                         </div>
@@ -668,38 +668,41 @@ function format_bytes($b) {
     
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        // Video handling for mobile
+        // Video handling for mobile - load source only when modal opens
         document.addEventListener('DOMContentLoaded', function() {
-            // Pause and reset videos when modals close
             document.querySelectorAll('.modal').forEach(function(modal) {
-                modal.addEventListener('hidden.bs.modal', function() {
+                // When modal is about to open
+                modal.addEventListener('show.bs.modal', function() {
                     const video = this.querySelector('video');
-                    if (video) {
-                        console.log('Pausing video');
-                        video.pause();
-                        video.currentTime = 0;
+                    if (video && video.dataset.src) {
+                        console.log('Loading video source:', video.dataset.src);
+                        
+                        // Clear any existing sources
+                        video.innerHTML = '';
+                        
+                        // Add source element
+                        const source = document.createElement('source');
+                        source.src = video.dataset.src;
+                        source.type = 'video/mp4';
+                        video.appendChild(source);
+                        
+                        // Load the video
+                        video.load();
+                        
+                        console.log('Video loaded, readyState:', video.readyState);
                     }
                 });
                 
-                // Log when modal opens
-                modal.addEventListener('shown.bs.modal', function() {
+                // When modal closes
+                modal.addEventListener('hidden.bs.modal', function() {
                     const video = this.querySelector('video');
                     if (video) {
-                        console.log('Video modal opened');
-                        console.log('Video src:', video.querySelector('source').src);
-                        console.log('Video readyState:', video.readyState);
-                        
-                        // Add error handler
-                        video.addEventListener('error', function(e) {
-                            console.error('Video error occurred:', e);
-                            console.error('Error code:', video.error ? video.error.code : 'unknown');
-                            console.error('Error message:', video.error ? video.error.message : 'unknown');
-                        });
-                        
-                        // Add canplay event
-                        video.addEventListener('canplay', function() {
-                            console.log('Video can play!');
-                        });
+                        console.log('Cleaning up video');
+                        video.pause();
+                        video.currentTime = 0;
+                        // Remove source to stop loading
+                        video.innerHTML = '';
+                        video.load();
                     }
                 });
             });
