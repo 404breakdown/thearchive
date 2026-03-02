@@ -12,257 +12,166 @@ if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) {
 
 $username = $_SESSION['username'] ?? 'User';
 $user_id = $_SESSION['user_id'] ?? 0;
-$success = '';
+$success = $_GET['success'] ?? '';
 $error = '';
 
 $db = getDB();
-$site_name = getSetting('site_name', 'TrueNAS Dashboard');
+$site_name = getSetting('site_name', 'TheArchive');
+
+// Handle bulk archive
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['bulk_archive'])) {
+    $selected_users = $_POST['selected_users'] ?? [];
+    if (!empty($selected_users)) {
+        $_SESSION['bulk_archive_users'] = $selected_users;
+        header('Location: bulk_archive.php');
+        exit;
+    } else {
+        $error = 'No users selected';
+    }
+}
+
+// Handle bulk download
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['bulk_download'])) {
+    $selected_users = $_POST['selected_users'] ?? [];
+    if (!empty($selected_users)) {
+        $_SESSION['bulk_download_users'] = $selected_users;
+        header('Location: bulk_download.php');
+        exit;
+    } else {
+        $error = 'No users selected';
+    }
+}
 
 $archive_base = __DIR__ . '/data/archive/';
 
-// Archive base should be a Docker volume mount
-if (!is_dir($archive_base)) {
-    die('Archive directory is not mounted. Check Docker volume configuration.');
-}
+// Get all users from database with stats
+$users_query = "SELECT * FROM archive_users ORDER BY created_at DESC";
+$db_users = $db->query($users_query)->fetchAll(PDO::FETCH_ASSOC);
 
-// Archive base is mounted via Docker volume - don't create it
-// if (!file_exists($archive_base)) {
-//     mkdir($archive_base, 0755, true);
-// }
+// Get all tags
+$tags = $db->query("SELECT * FROM user_tags ORDER BY name")->fetchAll(PDO::FETCH_ASSOC);
 
-// Create archive_users table
-try {
-    $db->exec('CREATE TABLE IF NOT EXISTS archive_users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        folder_name TEXT NOT NULL UNIQUE,
-        display_name TEXT,
-        notes TEXT,
-        profile_image TEXT,
-        url_1 TEXT,
-        url_2 TEXT,
-        url_3 TEXT,
-        location TEXT,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )');
-} catch (PDOException $e) {
-    $error = 'Database error';
-}
-
-// Helper function to find folder case-insensitive
-function find_folder($base_path, $folder_name) {
-    if (!is_dir($base_path)) return null;
-    $dirs = scandir($base_path);
-    foreach ($dirs as $dir) {
-        if (strcasecmp($dir, $folder_name) === 0 && is_dir($base_path . $dir)) {
-            return $dir;
-        }
-    }
-    return null;
-}
-
-// Handle ZIP import
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['archive_zip'])) {
-    try {
-        if ($_FILES['archive_zip']['error'] !== UPLOAD_ERR_OK) {
-            throw new Exception('Upload error');
-        }
-        
-        $zip_path = $_FILES['archive_zip']['tmp_name'];
-        $zip = new ZipArchive();
-        
-        if ($zip->open($zip_path) === true) {
-            $imported_users = [];
-            
-            for ($i = 0; $i < $zip->numFiles; $i++) {
-                $filename = $zip->getNameIndex($i);
-                if (basename($filename)[0] === '.' || substr($filename, -1) === '/') continue;
-                
-                $parts = explode('/', $filename);
-                if (count($parts) < 3) continue;
-                
-                $folder_username = $parts[0];
-                
-                // Detect layout: Dave/images or Dave/posts/images
-                $layout_type = '';
-                $target_folder = '';
-                
-                if (count($parts) === 3) {
-                    // Layout 1: Dave/images/file.jpg or Dave/videos/file.mp4
-                    $subfolder = strtolower($parts[1]);
-                    $file = $parts[2];
-                    
-                    if ($subfolder === 'images' || $subfolder === 'videos') {
-                        $layout_type = 'direct';
-                        $target_folder = $subfolder;
-                    } elseif ($subfolder === 'profile') {
-                        // Profile image
-                        $layout_type = 'profile';
-                        $target_folder = 'profile/images';
-                    }
-                } elseif (count($parts) === 4) {
-                    // Layout 2: Dave/posts/images/file.jpg or Dave/profile/images/file.jpg
-                    $middle = strtolower($parts[1]);
-                    $subfolder = strtolower($parts[2]);
-                    $file = $parts[3];
-                    
-                    if ($middle === 'posts' && ($subfolder === 'images' || $subfolder === 'videos')) {
-                        $layout_type = 'posts';
-                        $target_folder = 'posts/' . $subfolder;
-                    } elseif ($middle === 'profile' && $subfolder === 'images') {
-                        $layout_type = 'profile';
-                        $target_folder = 'profile/images';
-                    }
-                }
-                
-                if (empty($layout_type)) continue;
-                
-                // Create user folder structure
-                $user_dir = $archive_base . $folder_username . '/';
-                if (!file_exists($user_dir)) mkdir($user_dir, 0755);
-                
-                // Create target directory
-                $full_target = $user_dir . $target_folder . '/';
-                if (!file_exists($full_target)) mkdir($full_target, 0755, true);
-                
-                // Extract file
-                $destination = $full_target . basename($filename);
-                $file_content = $zip->getFromIndex($i);
-                file_put_contents($destination, $file_content);
-                
-                $imported_users[$folder_username] = true;
-            }
-            
-            $zip->close();
-            
-            // Add users to database
-            foreach (array_keys($imported_users) as $folder) {
-                try {
-                    $stmt = $db->prepare('INSERT OR IGNORE INTO archive_users (folder_name, display_name) VALUES (:folder, :display)');
-                    $stmt->execute(['folder' => $folder, 'display' => $folder]);
-                } catch (PDOException $e) {}
-            }
-            
-            $success = 'Imported ' . count($imported_users) . ' user(s)!';
-        } else {
-            $error = 'Failed to open ZIP';
-        }
-    } catch (Exception $e) {
-        $error = 'Import error: ' . $e->getMessage();
-    }
-}
-
-// Scan for username folders
+// Scan filesystem for users
 $user_folders = [];
-
 if (is_dir($archive_base)) {
-    $dirs = array_diff(scandir($archive_base), ['.', '..']);
-    
-    foreach ($dirs as $dir) {
-        $dir_path = $archive_base . $dir . '/';
-        if (!is_dir($dir_path)) continue;
+    foreach (scandir($archive_base) as $folder) {
+        if ($folder === '.' || $folder === '..') continue;
+        $folder_path = $archive_base . $folder;
+        if (!is_dir($folder_path)) continue;
         
-        $image_count = 0;
-        $video_count = 0;
-        $profile_image = null;
+        // Find user in database
+        $user_data = null;
+        foreach ($db_users as $db_user) {
+            if ($db_user['folder_name'] === $folder) {
+                $user_data = $db_user;
+                break;
+            }
+        }
         
-        // Check for profile image (Dave/profile/images/)
-        $profile_folder = find_folder($dir_path, 'profile');
-        if ($profile_folder) {
-            $profile_images_folder = find_folder($dir_path . $profile_folder . '/', 'images');
-            if ($profile_images_folder) {
-                $profile_path = $dir_path . $profile_folder . '/' . $profile_images_folder . '/';
-                $profile_files = array_diff(scandir($profile_path), ['.', '..']);
-                foreach ($profile_files as $pf) {
-                    if (is_file($profile_path . $pf)) {
-                        $ext = strtolower(pathinfo($pf, PATHINFO_EXTENSION));
-                        if (in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'webp'])) {
-                            $profile_image = 'data/archive/' . $dir . '/' . $profile_folder . '/' . $profile_images_folder . '/' . $pf;
-                            break;
-                        }
-                    }
+        // Calculate stats if not in DB
+        if (!$user_data || !$user_data['storage_size']) {
+            $size = 0;
+            $file_count = 0;
+            $iterator = new RecursiveIteratorIterator(
+                new RecursiveDirectoryIterator($folder_path, FilesystemIterator::SKIP_DOTS)
+            );
+            foreach ($iterator as $file) {
+                if ($file->isFile()) {
+                    $size += $file->getSize();
+                    $file_count++;
                 }
             }
-        }
-        
-        // Layout 1: Dave/images and Dave/videos
-        $images_folder = find_folder($dir_path, 'images');
-        $videos_folder = find_folder($dir_path, 'videos');
-        
-        if ($images_folder) {
-            $images = array_diff(scandir($dir_path . $images_folder), ['.', '..']);
-            $image_count += count(array_filter($images, function($f) use ($dir_path, $images_folder) {
-                return is_file($dir_path . $images_folder . '/' . $f);
-            }));
-        }
-        
-        if ($videos_folder) {
-            $videos = array_diff(scandir($dir_path . $videos_folder), ['.', '..']);
-            $video_count += count(array_filter($videos, function($f) use ($dir_path, $videos_folder) {
-                return is_file($dir_path . $videos_folder . '/' . $f);
-            }));
-        }
-        
-        // Layout 2: Dave/posts/images and Dave/posts/videos
-        $posts_folder = find_folder($dir_path, 'posts');
-        if ($posts_folder) {
-            $posts_path = $dir_path . $posts_folder . '/';
             
-            $posts_images_folder = find_folder($posts_path, 'images');
-            if ($posts_images_folder) {
-                $images = array_diff(scandir($posts_path . $posts_images_folder), ['.', '..']);
-                $image_count += count(array_filter($images, function($f) use ($posts_path, $posts_images_folder) {
-                    return is_file($posts_path . $posts_images_folder . '/' . $f);
-                }));
+            // Update DB if user exists
+            if ($user_data) {
+                $stmt = $db->prepare("UPDATE archive_users SET storage_size = ?, file_count = ? WHERE id = ?");
+                $stmt->execute([$size, $file_count, $user_data['id']]);
             }
-            
-            $posts_videos_folder = find_folder($posts_path, 'videos');
-            if ($posts_videos_folder) {
-                $videos = array_diff(scandir($posts_path . $posts_videos_folder), ['.', '..']);
-                $video_count += count(array_filter($videos, function($f) use ($posts_path, $posts_videos_folder) {
-                    return is_file($posts_path . $posts_videos_folder . '/' . $f);
-                }));
-            }
+        } else {
+            $size = $user_data['storage_size'];
+            $file_count = $user_data['file_count'];
         }
         
-        // Only add if has content
-        if ($image_count > 0 || $video_count > 0) {
-            // Get/create user info
-            try {
-                $stmt = $db->prepare('SELECT * FROM archive_users WHERE folder_name = :folder');
-                $stmt->execute(['folder' => $dir]);
-                $user_info = $stmt->fetch(PDO::FETCH_ASSOC);
-                
-                if (!$user_info) {
-                    $stmt = $db->prepare('INSERT INTO archive_users (folder_name, display_name, profile_image) VALUES (:folder, :display, :profile)');
-                    $stmt->execute(['folder' => $dir, 'display' => $dir, 'profile' => $profile_image]);
-                    $user_info = ['folder_name' => $dir, 'display_name' => $dir, 'notes' => '', 'profile_image' => $profile_image];
-                } elseif ($profile_image && !$user_info['profile_image']) {
-                    // Update profile image if found
-                    $stmt = $db->prepare('UPDATE archive_users SET profile_image = :profile WHERE folder_name = :folder');
-                    $stmt->execute(['profile' => $profile_image, 'folder' => $dir]);
-                    $user_info['profile_image'] = $profile_image;
-                }
-            } catch (PDOException $e) {
-                $user_info = ['folder_name' => $dir, 'display_name' => $dir, 'notes' => '', 'profile_image' => $profile_image];
-            }
-            
-            $user_folders[] = [
-                'folder' => $dir,
-                'display_name' => $user_info['display_name'] ?? $dir,
-                'notes' => $user_info['notes'] ?? '',
-                'profile_image' => $user_info['profile_image'] ?? $profile_image,
-                'image_count' => $image_count,
-                'video_count' => $video_count,
-                'total' => $image_count + $video_count
-            ];
+        // Get user tags
+        $user_tags = [];
+        if ($user_data) {
+            $stmt = $db->prepare("
+                SELECT t.* FROM user_tags t
+                JOIN user_tag_assignments a ON t.id = a.tag_id
+                WHERE a.user_id = ?
+            ");
+            $stmt->execute([$user_data['id']]);
+            $user_tags = $stmt->fetchAll(PDO::FETCH_ASSOC);
         }
+        
+        $user_folders[] = [
+            'folder' => $folder,
+            'data' => $user_data,
+            'size' => $size,
+            'file_count' => $file_count,
+            'tags' => $user_tags,
+            'is_favorite' => $user_data['is_favorite'] ?? 0,
+            'color_label' => $user_data['color_label'] ?? null,
+            'view_count' => $user_data['view_count'] ?? 0
+        ];
     }
 }
 
-usort($user_folders, function($a, $b) {
-    return strcmp($a['folder'], $b['folder']);
+// Apply filters and search
+$search = $_GET['search'] ?? '';
+$filter_tag = $_GET['tag'] ?? '';
+$filter_favorite = isset($_GET['favorite']) ? 1 : 0;
+$sort_by = $_GET['sort'] ?? 'name'; // name, size, files, views, date
+
+if ($search) {
+    $user_folders = array_filter($user_folders, function($user) use ($search) {
+        $name = $user['data']['display_name'] ?? $user['folder'];
+        return stripos($name, $search) !== false || stripos($user['folder'], $search) !== false;
+    });
+}
+
+if ($filter_tag) {
+    $user_folders = array_filter($user_folders, function($user) use ($filter_tag) {
+        foreach ($user['tags'] as $tag) {
+            if ($tag['name'] === $filter_tag) return true;
+        }
+        return false;
+    });
+}
+
+if ($filter_favorite) {
+    $user_folders = array_filter($user_folders, function($user) {
+        return $user['is_favorite'] == 1;
+    });
+}
+
+// Sort users
+usort($user_folders, function($a, $b) use ($sort_by) {
+    switch ($sort_by) {
+        case 'size':
+            return $b['size'] - $a['size'];
+        case 'files':
+            return $b['file_count'] - $a['file_count'];
+        case 'views':
+            return ($b['view_count'] ?? 0) - ($a['view_count'] ?? 0);
+        case 'date':
+            $date_a = $a['data']['created_at'] ?? '0';
+            $date_b = $b['data']['created_at'] ?? '0';
+            return strcmp($date_b, $date_a);
+        case 'name':
+        default:
+            $name_a = $a['data']['display_name'] ?? $a['folder'];
+            $name_b = $b['data']['display_name'] ?? $b['folder'];
+            return strcasecmp($name_a, $name_b);
+    }
 });
+
+function format_bytes($bytes) {
+    if ($bytes >= 1073741824) return number_format($bytes / 1073741824, 2) . ' GB';
+    elseif ($bytes >= 1048576) return number_format($bytes / 1048576, 2) . ' MB';
+    elseif ($bytes >= 1024) return number_format($bytes / 1024, 2) . ' KB';
+    else return $bytes . ' B';
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -274,25 +183,66 @@ usort($user_folders, function($a, $b) {
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
     <?php include 'mobile-styles.php'; ?>
     <style>
-        .user-card { cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; }
-        .user-card:hover { transform: translateY(-5px); box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
-        .user-avatar { width: 60px; height: 60px; border-radius: 50%; object-fit: cover; background: #374151; }
-    </style>
-    <style>
-        .user-card {
+        .user-card { 
+            cursor: pointer; 
+            transition: transform 0.2s, box-shadow 0.2s; 
+            position: relative;
+        }
+        .user-card:hover { 
+            transform: translateY(-5px); 
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3); 
+        }
+        .user-card.selected {
+            border: 3px solid #0d6efd;
+            box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.25);
+        }
+        .user-avatar { 
+            width: 60px; 
+            height: 60px; 
+            border-radius: 50%; 
+            object-fit: cover; 
+            background: #374151; 
+        }
+        .select-checkbox {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 5;
+            width: 24px;
+            height: 24px;
             cursor: pointer;
-            transition: transform 0.2s, box-shadow 0.2s;
         }
-        .user-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        .favorite-star {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            font-size: 1.5rem;
+            cursor: pointer;
+            z-index: 5;
         }
-        .user-avatar {
-            width: 60px;
-            height: 60px;
-            border-radius: 50%;
-            object-fit: cover;
-            background: #374151;
+        .color-label {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+        }
+        .tag-badge {
+            font-size: 0.7rem;
+            padding: 2px 6px;
+        }
+        .bulk-actions {
+            position: sticky;
+            top: 70px;
+            z-index: 10;
+            background: var(--bs-body-bg);
+            padding: 1rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            display: none;
+        }
+        .bulk-actions.show {
+            display: block;
         }
     </style>
 </head>
@@ -302,140 +252,269 @@ usort($user_folders, function($a, $b) {
     include 'sidebar.php'; 
     ?>
     
-    <!-- Main Content -->
     <div class="content-wrapper">
         <div class="top-nav d-flex justify-content-between align-items-center flex-wrap">
             <h3 class="mb-0"><i class="bi bi-images"></i> Gallery</h3>
-            <div class="text-muted"><?php echo count($user_folders); ?> users</div>
+            <div class="d-flex align-items-center gap-2">
+                <span class="text-muted"><?php echo count($user_folders); ?> users</span>
+                <a href="manage_tags.php" class="btn btn-outline-light btn-sm">
+                    <i class="bi bi-tags"></i> Manage Tags
+                </a>
+                <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#uploadZipModal">
+                    <i class="bi bi-upload"></i> Import ZIP
+                </button>
+            </div>
         </div>
         
         <div class="container-fluid">
-            <?php if ($success): ?>
+            <?php if($success): ?>
                 <div class="alert alert-success alert-dismissible fade show">
                     <?php echo htmlspecialchars($success); ?>
                     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                 </div>
             <?php endif; ?>
             
-            <?php if ($error): ?>
+            <?php if($error): ?>
                 <div class="alert alert-danger alert-dismissible fade show">
                     <?php echo htmlspecialchars($error); ?>
                     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                 </div>
             <?php endif; ?>
             
-            <div class="alert alert-info">
-                <i class="bi bi-info-circle"></i> <strong>Supported Structures:</strong><br>
-                <small>
-                • <code>Dave/Images/</code> and <code>Dave/Videos/</code><br>
-                • <code>Dave/posts/Images/</code> and <code>Dave/posts/Videos/</code><br>
-                • <code>Dave/profile/Images/</code> (used as avatar)<br>
-                (Case-insensitive)
-                </small>
+            <!-- Bulk Actions Bar -->
+            <div id="bulkActions" class="bulk-actions mb-3">
+                <form method="POST" id="bulkForm">
+                    <div class="d-flex align-items-center gap-2 flex-wrap">
+                        <span class="fw-bold"><span id="selectedCount">0</span> selected</span>
+                        <button type="submit" name="bulk_archive" class="btn btn-warning btn-sm">
+                            <i class="bi bi-archive"></i> Archive Selected
+                        </button>
+                        <button type="submit" name="bulk_download" class="btn btn-primary btn-sm">
+                            <i class="bi bi-download"></i> Download as ZIP
+                        </button>
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="clearSelection()">
+                            <i class="bi bi-x"></i> Clear
+                        </button>
+                    </div>
+                    <input type="hidden" name="selected_users" id="selectedUsersInput">
+                </form>
             </div>
             
-            <div class="row">
-                <div class="col-md-4 mb-3 mobile-hide-form">
-                    <div class="card">
-                        <div class="card-header"><i class="bi bi-upload"></i> Import ZIP</div>
-                        <div class="card-body">
-                            <form method="POST" enctype="multipart/form-data">
-                                <div class="mb-3">
-                                    <input type="file" class="form-control" name="archive_zip" accept=".zip" required>
-                                </div>
-                                <div class="alert alert-warning small">
-                                    <strong>Supported structures:</strong><br>
-                                    <code>
-                                    Dave/Images/photo.jpg<br>
-                                    Dave/Videos/vid.mp4<br>
-                                    </code>
-                                    OR<br>
-                                    <code>
-                                    Dave/posts/Images/photo.jpg<br>
-                                    Dave/posts/Videos/vid.mp4<br>
-                                    Dave/profile/Images/avatar.jpg
-                                    </code>
-                                </div>
-                                <button type="submit" class="btn btn-primary w-100">
-                                    <i class="bi bi-upload"></i> Import
-                                </button>
-                            </form>
+            <!-- Search and Filters -->
+            <div class="card mb-3">
+                <div class="card-body">
+                    <form method="GET" class="row g-2">
+                        <div class="col-md-4">
+                            <input type="text" class="form-control" name="search" placeholder="Search users..." value="<?php echo htmlspecialchars($search); ?>">
                         </div>
-                    </div>
-                </div>
-                
-                <div class="col-md-8">
-                    <?php if (empty($user_folders)): ?>
-                        <div class="text-center py-5">
-                            <i class="bi bi-inbox" style="font-size: 4rem; color: #4b5563;"></i>
-                            <p class="text-muted mt-3">No archive users found</p>
+                        <div class="col-md-2">
+                            <select class="form-select" name="sort">
+                                <option value="name" <?php echo $sort_by === 'name' ? 'selected' : ''; ?>>Name</option>
+                                <option value="size" <?php echo $sort_by === 'size' ? 'selected' : ''; ?>>Storage Size</option>
+                                <option value="files" <?php echo $sort_by === 'files' ? 'selected' : ''; ?>>File Count</option>
+                                <option value="views" <?php echo $sort_by === 'views' ? 'selected' : ''; ?>>Most Viewed</option>
+                                <option value="date" <?php echo $sort_by === 'date' ? 'selected' : ''; ?>>Date Added</option>
+                            </select>
                         </div>
-                    <?php else: ?>
-                        <div class="row">
-                            <?php foreach ($user_folders as $user): ?>
-                                <div class="col-md-6 col-lg-4 mb-3">
-                                    <div class="card user-card" onclick="window.location.href='gallery_view.php?user=<?php echo urlencode($user['folder']); ?>'">
-                                        <div class="card-body">
-                                            <div class="d-flex align-items-center mb-3">
-                                                <?php if ($user['profile_image']): ?>
-                                                    <img src="<?php echo htmlspecialchars($user['profile_image']); ?>" class="user-avatar me-3">
-                                                <?php else: ?>
-                                                    <div class="user-avatar me-3 d-flex align-items-center justify-content-center">
-                                                        <i class="bi bi-person-circle" style="font-size: 2rem;"></i>
-                                                    </div>
-                                                <?php endif; ?>
-                                                <div>
-                                                    <h5 class="mb-0"><?php echo htmlspecialchars($user['display_name']); ?></h5>
-                                                    <small class="text-muted"><?php echo htmlspecialchars($user['folder']); ?></small>
-                                                </div>
-                                            </div>
-                                            <?php if ($user['notes']): ?>
-                                                <p class="small mb-2"><?php echo htmlspecialchars(substr($user['notes'], 0, 80)); ?><?php echo strlen($user['notes']) > 80 ? '...' : ''; ?></p>
-                                            <?php endif; ?>
-                                            <div class="d-flex justify-content-between mt-2">
-                                                <span class="badge bg-primary">
-                                                    <i class="bi bi-images"></i> <?php echo $user['image_count']; ?>
-                                                </span>
-                                                <span class="badge bg-warning">
-                                                    <i class="bi bi-play-circle"></i> <?php echo $user['video_count']; ?>
-                                                </span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            <?php endforeach; ?>
+                        <div class="col-md-2">
+                            <select class="form-select" name="tag">
+                                <option value="">All Tags</option>
+                                <?php foreach ($tags as $tag): ?>
+                                    <option value="<?php echo htmlspecialchars($tag['name']); ?>" <?php echo $filter_tag === $tag['name'] ? 'selected' : ''; ?>>
+                                        <?php echo htmlspecialchars($tag['name']); ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
                         </div>
-                    <?php endif; ?>
+                        <div class="col-md-2">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="favorite" id="filterFavorite" <?php echo $filter_favorite ? 'checked' : ''; ?>>
+                                <label class="form-check-label" for="filterFavorite">
+                                    ⭐ Favorites Only
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <button type="submit" class="btn btn-primary w-100">
+                                <i class="bi bi-search"></i> Filter
+                            </button>
+                        </div>
+                    </form>
                 </div>
             </div>
+            
+            <!-- User Grid -->
+            <div class="row g-3">
+                <?php foreach ($user_folders as $user): ?>
+                    <?php
+                        $display_name = $user['data']['display_name'] ?? $user['folder'];
+                        $profile_img = null;
+                        
+                        // Try multiple profile locations
+                        $profile_locations = [
+                            $archive_base . $user['folder'] . '/profile/Images/',
+                            $archive_base . $user['folder'] . '/Profile/Images/',
+                            $archive_base . $user['folder'] . '/profile/',
+                            $archive_base . $user['folder'] . '/Profile/'
+                        ];
+                        
+                        foreach ($profile_locations as $profile_dir) {
+                            if (is_dir($profile_dir)) {
+                                $profile_files = array_diff(scandir($profile_dir), ['.', '..']);
+                                foreach ($profile_files as $file) {
+                                    $ext = strtolower(pathinfo($file, PATHINFO_EXTENSION));
+                                    if (in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'webp'])) {
+                                        $relative_path = substr($profile_dir . $file, strlen($archive_base));
+                                        $profile_img = 'data/archive/' . $relative_path;
+                                        break 2;
+                                    }
+                                }
+                            }
+                        }
+                    ?>
+                    <div class="col-xl-2 col-lg-3 col-md-4 col-sm-6">
+                        <div class="card user-card h-100" data-username="<?php echo htmlspecialchars($user['folder']); ?>">
+                            <?php if ($user['color_label']): ?>
+                                <div class="color-label" style="background: <?php echo htmlspecialchars($user['color_label']); ?>;"></div>
+                            <?php endif; ?>
+                            
+                            <input type="checkbox" class="form-check-input select-checkbox" onclick="event.stopPropagation(); toggleSelection(this, '<?php echo htmlspecialchars($user['folder']); ?>');">
+                            
+                            <span class="favorite-star" onclick="event.stopPropagation(); toggleFavorite('<?php echo htmlspecialchars($user['folder']); ?>', this);">
+                                <?php echo $user['is_favorite'] ? '⭐' : '☆'; ?>
+                            </span>
+                            
+                            <div class="card-body text-center" onclick="window.location.href='gallery_view.php?user=<?php echo urlencode($user['folder']); ?>'">
+                                <?php if ($profile_img): ?>
+                                    <img src="<?php echo htmlspecialchars($profile_img); ?>" class="user-avatar mb-2" alt="<?php echo htmlspecialchars($display_name); ?>">
+                                <?php else: ?>
+                                    <div class="user-avatar mx-auto mb-2 d-flex align-items-center justify-content-center">
+                                        <i class="bi bi-person-fill" style="font-size: 2rem; color: #9ca3af;"></i>
+                                    </div>
+                                <?php endif; ?>
+                                
+                                <h6 class="mb-1"><?php echo htmlspecialchars($display_name); ?></h6>
+                                
+                                <div class="small text-muted mb-2">
+                                    <div><i class="bi bi-hdd"></i> <?php echo format_bytes($user['size']); ?></div>
+                                    <div><i class="bi bi-files"></i> <?php echo number_format($user['file_count']); ?> files</div>
+                                    <?php if ($user['view_count'] > 0): ?>
+                                        <div><i class="bi bi-eye"></i> <?php echo number_format($user['view_count']); ?> views</div>
+                                    <?php endif; ?>
+                                </div>
+                                
+                                <?php if (!empty($user['tags'])): ?>
+                                    <div class="d-flex flex-wrap gap-1 justify-content-center mb-2">
+                                        <?php foreach ($user['tags'] as $tag): ?>
+                                            <span class="badge tag-badge" style="background-color: <?php echo htmlspecialchars($tag['color']); ?>">
+                                                <?php echo htmlspecialchars($tag['name']); ?>
+                                            </span>
+                                        <?php endforeach; ?>
+                                    </div>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                    </div>
+                <?php endforeach; ?>
+            </div>
+            
+            <?php if (empty($user_folders)): ?>
+                <div class="text-center py-5">
+                    <i class="bi bi-folder2-open" style="font-size: 4rem; color: #4b5563;"></i>
+                    <p class="text-muted mt-3">No users found</p>
+                    <?php if ($search || $filter_tag || $filter_favorite): ?>
+                        <a href="gallery.php" class="btn btn-primary">Clear Filters</a>
+                    <?php endif; ?>
+                </div>
+            <?php endif; ?>
         </div>
     </div>
     
-    <button class="fab" data-bs-toggle="modal" data-bs-target="#importModal"><i class="bi bi-plus-lg"></i></button>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let selectedUsers = new Set();
+        
+        function toggleSelection(checkbox, username) {
+            const card = checkbox.closest('.user-card');
+            
+            if (checkbox.checked) {
+                selectedUsers.add(username);
+                card.classList.add('selected');
+            } else {
+                selectedUsers.delete(username);
+                card.classList.remove('selected');
+            }
+            
+            updateBulkActions();
+        }
+        
+        function updateBulkActions() {
+            const count = selectedUsers.size;
+            const bulkActions = document.getElementById('bulkActions');
+            const selectedCount = document.getElementById('selectedCount');
+            const selectedUsersInput = document.getElementById('selectedUsersInput');
+            
+            selectedCount.textContent = count;
+            selectedUsersInput.value = JSON.stringify(Array.from(selectedUsers));
+            
+            if (count > 0) {
+                bulkActions.classList.add('show');
+            } else {
+                bulkActions.classList.remove('show');
+            }
+        }
+        
+        function clearSelection() {
+            selectedUsers.clear();
+            document.querySelectorAll('.select-checkbox').forEach(cb => cb.checked = false);
+            document.querySelectorAll('.user-card').forEach(card => card.classList.remove('selected'));
+            updateBulkActions();
+        }
+        
+        function toggleFavorite(username, element) {
+            fetch('toggle_favorite.php?user=' + encodeURIComponent(username))
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success) {
+                        element.textContent = data.is_favorite ? '⭐' : '☆';
+                    }
+                });
+        }
+    </script>
     
-    <div class="modal fade" id="importModal" tabindex="-1">
+    <!-- ZIP Upload Modal -->
+    <div class="modal fade" id="uploadZipModal" tabindex="-1">
         <div class="modal-dialog">
             <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title"><i class="bi bi-upload"></i> Import ZIP</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <form method="POST" enctype="multipart/form-data">
+                <form method="POST" action="import_zip.php" enctype="multipart/form-data">
+                    <div class="modal-header">
+                        <h5 class="modal-title"><i class="bi bi-upload"></i> Import User ZIP</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
                     <div class="modal-body">
-                        <input type="file" class="form-control" name="archive_zip" accept=".zip" required>
-                        <div class="alert alert-info small mt-3">
-                            Both structures supported!
+                        <div class="mb-3">
+                            <label class="form-label">Select ZIP File</label>
+                            <input type="file" class="form-control" name="zip_file" accept=".zip" required>
+                            <small class="text-muted">Upload a ZIP file containing user media in the correct folder structure</small>
+                        </div>
+                        <div class="alert alert-info small">
+                            <strong>Supported Structure:</strong><br>
+                            <code>Username/Images/</code><br>
+                            <code>Username/Videos/</code><br>
+                            <code>Username/posts/Images/</code><br>
+                            <code>Username/posts/Videos/</code><br>
+                            <code>Username/profile/Images/</code>
                         </div>
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" class="btn btn-primary">Import</button>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-upload"></i> Import ZIP
+                        </button>
                     </div>
                 </form>
             </div>
         </div>
     </div>
-    
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
